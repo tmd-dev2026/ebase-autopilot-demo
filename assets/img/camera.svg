@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360" role="img" aria-labelledby="title">
+  <title id="title">ブランドのないフィルム一眼レフカメラのオリジナルイラスト</title>
+  <ellipse cx="240" cy="289" rx="172" ry="18" fill="#dbe1e9"/>
+  <path d="M87 121h94l23-33h72l24 33h84v135H87Z" fill="#a6afba" stroke="#4c596a" stroke-width="5"/>
+  <rect x="85" y="150" width="300" height="113" rx="17" fill="#384556"/><rect x="100" y="162" width="57" height="86" rx="10" fill="#4c596a"/>
+  <path d="M207 113h67l14 26h-95Z" fill="#cdd4dc"/><rect x="218" y="116" width="43" height="16" rx="4" fill="#384556"/>
+  <rect x="110" y="108" width="48" height="19" rx="5" fill="#536072"/><rect x="326" y="109" width="32" height="16" rx="5" fill="#536072"/>
+  <circle cx="254" cy="203" r="81" fill="#aab6c5" stroke="#273649" stroke-width="8"/><circle cx="254" cy="203" r="66" fill="#324456"/><circle cx="254" cy="203" r="51" fill="#5a7490" stroke="#182a3e" stroke-width="8"/><circle cx="254" cy="203" r="34" fill="#1f354c"/><path d="M230 179c12-14 35-11 46 5" fill="none" stroke="#91b5c8" stroke-width="10" stroke-linecap="round"/><circle cx="350" cy="171" r="7" fill="#d6dce3"/>
+</svg>

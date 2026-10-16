@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#203d70">
+  <title>eBase Autopilot 体験版</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script defer src="assets/js/data.js"></script>
+  <script defer src="assets/js/calc.js"></script>
+  <script defer src="assets/js/core.js"></script>
+  <script defer src="assets/js/guide.js"></script>
+  <script defer src="assets/js/screens/welcome.js"></script>
+  <script defer src="assets/js/screens/dashboard.js"></script>
+  <script defer src="assets/js/screens/products.js"></script>
+  <script defer src="assets/js/screens/profit.js"></script>
+  <script defer src="assets/js/screens/listings.js"></script>
+  <script defer src="assets/js/screens/monitor.js"></script>
+  <script defer src="assets/js/screens/orders.js"></script>
+  <script defer src="assets/js/screens/messages.js"></script>
+  <script defer src="assets/js/screens/watchers.js"></script>
+  <script defer src="assets/js/screens/offers.js"></script>
+  <script defer src="assets/js/screens/auto-list.js"></script>
+  <script defer src="assets/js/screens/profit-report.js"></script>
+  <script defer src="assets/js/screens/shipping.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="mobile-header"><button id="menu-toggle" aria-controls="sidebar" aria-expanded="false" aria-label="メニューを開く">☰</button><span>eBase <strong>Autopilot</strong></span><span class="badge">体験版</span></header>
+  <div id="drawer-backdrop" hidden></div>
+  <aside id="sidebar" class="sidebar" aria-label="メインメニュー">
+    <a class="brand" href="#/welcome"><span class="brand-mark" aria-hidden="true">a</span><span>eBase<strong>Autopilot <small>体験版</small></strong></span></a>
+    <button id="menu-close" class="mobile-only" aria-label="メニューを閉じる">閉じる ×</button>
+    <nav id="navigation"></nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span>ローカルで動く体験版<br><small>外部サービスへの接続はありません</small><button id="reset-button" class="text-button">最初からやり直す</button></div>
+  </aside>
+  <div class="app-shell">
+    <div class="topbar"><span>出品のその先まで、ひとつの場所で。</span><span class="badge">DEMO WORKSPACE</span></div>
+    <section id="guide" aria-label="体験ガイド"></section>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <footer class="disclaimer">体験版: 表示される数字・料金・手数料はすべて例です。実際の結果を保証するものではありません。</footer>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="modal-root"></div>
+</body>
+</html>

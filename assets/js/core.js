@@ -1,0 +1,171 @@
+(function () {
+  'use strict';
+  var D = window.Demo, storageKey = 'ebase-autopilot-demo-v1', screens = {}, activeScreen;
+  var modalReturn = null, modalResolve = null, toastTimer, drawerReturn;
+  D.state = D.initialState();
+  try {
+    var saved = JSON.parse(localStorage.getItem(storageKey));
+    if (saved && saved.version === 1 && ['products', 'listings', 'orders', 'messages', 'templates', 'offers', 'report', 'shipping'].every(function (k) { return Array.isArray(saved[k]); }) && saved.events && saved.profitInputs) {
+      D.state = Object.assign(D.initialState(), saved);
+    }
+  } catch (error) { /* The in-memory state remains fully usable. */ }
+  D.save = function () { try { localStorage.setItem(storageKey, JSON.stringify(D.state)); } catch (error) { /* Memory fallback. */ } };
+  D.esc = function (value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  D.yen = function (value) { var rounded = Math.round(value); return (rounded < 0 ? '-¥' : '¥') + Math.abs(rounded).toLocaleString('ja-JP'); };
+  D.usd = function (value) { return '$' + Number(value).toFixed(2); };
+  D.id = function (prefix) { return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); };
+  D.register = function (route, screen) { screens[route] = screen; };
+  D.go = function (route) { if (location.hash === '#/' + route) D.render(); else location.hash = '#/' + route; };
+  D.event = function (name) { D.state.events[name] = true; D.save(); };
+  D.heading = function (title, subtitle, eyebrow) { return '<header class="page-heading"><div><div class="eyebrow">' + D.esc(eyebrow || 'DEMO WORKSPACE') + '</div><h1>' + D.esc(title) + '</h1><p>' + D.esc(subtitle || '') + '</p></div><span class="badge">体験版</span></header>'; };
+  D.note = function (text) { return '<aside class="real-note"><div><strong>本物ではここが自動でこうなります</strong><p>' + D.esc(text) + '</p></div></aside>'; };
+  D.empty = function (text, link, label) { return '<div class="card empty"><h3>' + D.esc(text) + '</h3><p>左のメニューからも自由に体験できます。</p>' + (link ? '<a class="button" href="#/' + link + '">' + D.esc(label) + '</a>' : '') + '</div>'; };
+  D.image = function (p, small) { return '<img class="' + (small ? 'product-thumb' : 'product-image') + '" src="assets/img/' + p.image + '" alt="' + D.esc(p.name) + 'の自作イラスト">'; };
+  D.live = function () { return D.state.listings.filter(function (l) { return l.status === 'live'; }); };
+  D.selected = function () { return D.product(D.state.selected) || D.data.products[0]; };
+  D.profitValues = function (id) {
+    var p = D.product(id) || D.selected();
+    return Object.assign({ sale: p.sale, cost: p.cost, weight: p.weight, rate: 155, buyerShipping: 0, carrier: 'SpeedPAK' }, D.state.profitInputs[p.id]);
+  };
+  D.listingProfit = function (listing, sale) {
+    var quotes = window.DemoCalc.shippingRates(listing.weight), quote = quotes.find(function (q) { return q.carrier === listing.carrier; }) || quotes[0];
+    return window.DemoCalc.calcProfit({ sale: sale === undefined ? listing.sale : sale, buyerShipping: listing.buyerShipping || 0, cost: listing.cost, rate: listing.rate, shipping: quote.price });
+  };
+  D.formula = function (input) {
+    var r = window.DemoCalc.calcProfit(input);
+    return '<dl class="formula"><div><dt>売値 ' + D.usd(input.sale) + ' + 買い手送料 ' + D.usd(input.buyerShipping || 0) + '<br>× 為替 ' + input.rate + ' 円/USD（例）</dt><dd>' + D.yen(r.revenueYen) + '</dd></div><div><dt>− 手数料<br><small>粗額 × (13.25% + 1.35%) + $0.40</small></dt><dd>' + D.yen(r.feeYen) + '</dd></div><div><dt>− 国際送料</dt><dd>' + D.yen(r.shipping) + '</dd></div><div><dt>− 仕入れ</dt><dd>' + D.yen(r.cost) + '</dd></div>' + (r.domestic || r.ads ? '<div><dt>− 国内送料 / 広告費</dt><dd>' + D.yen(r.domestic) + ' / ' + D.yen(r.ads) + '</dd></div>' : '') + '<div class="total"><dt>手残り（例）</dt><dd class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + (r.net < 0 ? '赤字 ' : '黒字 ') + D.yen(r.net) + '</dd></div></dl><small>円表示は四捨五入。手残りは丸め前の手数料から計算します。</small>';
+  };
+  D.blocked = function (p) {
+    var check = window.DemoCalc.checkListable(p);
+    return '<div class="danger-box"><h3>この商品は出せません</h3><p>この例では保証書や購入証明がなく、本物と確認できないため出品を止めます。本物と証明できる商品の一律禁止を意味しません。</p><ul>' + check.reasons.map(function (r) { return '<li>' + D.esc(r) + '</li>'; }).join('') + '</ul><p>違反時は、出品の削除、警告、アクティビティの制限、アカウント停止の措置になり得ます。</p><a class="button" href="#/products" data-other-products>他の商品で試す</a></div>';
+  };
+  D.toast = function (text) {
+    clearTimeout(toastTimer); document.getElementById('toast').textContent = text;
+    toastTimer = setTimeout(function () { document.getElementById('toast').textContent = ''; }, 4500);
+  };
+  D.closeModal = function () {
+    document.getElementById('modal-root').innerHTML = ''; document.body.classList.remove('modal-open');
+    if (modalReturn && modalReturn.isConnected) modalReturn.focus(); else document.getElementById('main').focus();
+    modalReturn = null;
+    if (modalResolve) { var finish = modalResolve; modalResolve = null; finish(false); }
+  };
+  D.modal = function (title, content) {
+    if (document.querySelector('.modal')) D.closeModal();
+    modalReturn = document.activeElement;
+    document.getElementById('modal-root').innerHTML = '<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"><div class="modal-head"><h2 id="modal-title">' + D.esc(title) + '</h2><button data-modal-close aria-label="ダイアログを閉じる">×</button></div>' + content + '</section></div>';
+    document.body.classList.add('modal-open'); document.querySelector('.modal').focus();
+  };
+  D.confirm = function (title, content, labels) {
+    return new Promise(function (resolve) {
+      D.modal(title, content + (labels || []).map(function (label) { return '<label class="check-row"><input type="checkbox" data-confirm-check>' + D.esc(label) + '</label>'; }).join('') + '<div class="row section"><button data-modal-confirm class="primary">確認して進む</button><button data-modal-close>キャンセル</button></div><p id="confirm-error" role="status"></p>');
+      modalResolve = resolve;
+    });
+  };
+  D.busy = false;
+  D.loading = async function (title, steps, duration) {
+    if (D.busy) return false;
+    D.busy = true;
+    D.modal(title, '<p><span class="spinner" aria-hidden="true"></span><span id="loading-status" role="status" aria-live="polite">準備中…</span></p><ol class="loading-steps check-list">' + steps.map(function (s, i) { return '<li id="loading-' + i + '">○ ' + D.esc(s) + '</li>'; }).join('') + '</ol><small>処理はすべてデモです。閉じるとキャンセルできます。</small>');
+    var dialog = document.querySelector('.modal');
+    for (var i = 0; i < steps.length; i += 1) {
+      if (!dialog.isConnected) { D.busy = false; return false; }
+      document.getElementById('loading-status').textContent = steps[i];
+      document.getElementById('loading-' + i).className = 'current';
+      await new Promise(function (resolve) { setTimeout(resolve, duration || 650); });
+      if (!dialog.isConnected) { D.busy = false; return false; }
+      document.getElementById('loading-' + i).className = 'done';
+      document.getElementById('loading-' + i).textContent = '✓ ' + steps[i];
+    }
+    D.closeModal(); D.busy = false; return true;
+  };
+  var menu = [
+    ['仕入れ・出品', [['dashboard', 'ダッシュボード'], ['products', 'AI出品'], ['profit', '利益計算'], ['listings', '出品管理'], ['monitor', '在庫監視']]],
+    ['売れた後', [['orders', '注文管理'], ['messages', 'メッセージ']]],
+    ['売上を伸ばす・お金', [['watchers', 'ウォッチャー分析'], ['offers', 'オファー'], ['auto-list', '自動出品設定'], ['profit-report', '収益管理'], ['shipping', '送料管理']]]
+  ];
+  function navLink(route, label) {
+    var unread = D.state.messages.filter(function (m) { return !m.read; }).length;
+    return '<a class="nav-link' + (D.route === route ? ' active' : '') + '" ' + (D.route === route ? 'aria-current="page" ' : '') + 'href="#/' + route + '">' + label + (route === 'messages' && unread ? '<span class="badge">' + unread + '</span>' : '') + '</a>';
+  }
+  D.navigation = function () {
+    document.getElementById('navigation').innerHTML = navLink('welcome', 'はじめに') + '<a class="nav-link" href="market/index.html" target="_blank" rel="noopener" data-market>仕入れ先（架空フリマ）を開く ↗</a>' + menu.map(function (group) { return '<div class="nav-group">' + group[0] + '</div>' + group[1].map(function (m) { return navLink(m[0], m[1]); }).join(''); }).join('') + navLink('summary', '体験のまとめ');
+  };
+  D.render = function () {
+    var route = location.hash.replace(/^#\//, '') || 'welcome';
+    if (!screens[route]) route = 'welcome';
+    D.route = route; activeScreen = screens[route];
+    if (route === 'profit') D.event('profitSeen');
+    if (route === 'dashboard' && D.state.events.listed) D.event('dashboardSeen');
+    if (route === 'watchers') D.event('watchersSeen');
+    if (route === 'profit-report') D.event('reportSeen');
+    if (route === 'shipping') D.event('shippingSeen');
+    D.navigation();
+    document.getElementById('main').innerHTML = activeScreen.render();
+    if (activeScreen.afterRender) activeScreen.afterRender();
+    D.guide.render();
+  };
+  D.refreshGuide = function () { D.save(); D.navigation(); D.guide.render(); };
+  function closeDrawer() {
+    document.getElementById('sidebar').classList.remove('open'); document.getElementById('drawer-backdrop').hidden = true;
+    document.getElementById('menu-toggle').setAttribute('aria-expanded', 'false');
+    if (drawerReturn) { drawerReturn.focus(); drawerReturn = null; }
+  }
+  function trap(event, container) {
+    var elements = Array.from(container.querySelectorAll('a[href], button:not([disabled]), input, select, textarea, [tabindex="0"]')).filter(function (el) { return el.getClientRects().length; });
+    var first = elements[0], last = elements[elements.length - 1];
+    if (!first) return;
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === container)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || document.activeElement === container)) { event.preventDefault(); first.focus(); }
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    D.render();
+    window.addEventListener('hashchange', function () { if (document.querySelector('.modal')) D.closeModal(); closeDrawer(); D.render(); document.getElementById('main').focus(); });
+    document.getElementById('menu-toggle').addEventListener('click', function () {
+      drawerReturn = document.activeElement; document.getElementById('sidebar').classList.add('open');
+      document.getElementById('drawer-backdrop').hidden = false; this.setAttribute('aria-expanded', 'true'); document.getElementById('menu-close').focus();
+    });
+    document.getElementById('menu-close').addEventListener('click', closeDrawer);
+    document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
+    document.getElementById('reset-button').addEventListener('click', async function () {
+      closeDrawer();
+      if (await D.confirm('最初からやり直す', '<p>このブラウザに保存した体験の操作を初期化し、最初のダミー出品 2 件に戻します。</p>')) {
+        D.state = D.initialState(); D.save(); D.go('welcome'); D.toast('体験を初期化しました');
+      }
+    });
+    document.addEventListener('click', function (event) {
+      if (event.target.closest('.skip-link')) { event.preventDefault(); document.getElementById('main').focus(); return; }
+      var market = event.target.closest('[data-market]');
+      if (market) { D.state.marketOpened = true; D.state.started = true; D.refreshGuide(); }
+      var other = event.target.closest('[data-other-products]');
+      if (other) { D.state.selected = 'item-1'; D.state.urlInvalid = true; D.state.aiOpen = false; D.save(); if (D.route === 'products') D.render(); if (document.querySelector('.modal')) D.closeModal(); }
+      if (event.target.closest('[data-modal-close]')) D.closeModal();
+      if (event.target.closest('[data-modal-confirm]')) {
+        var checks = Array.from(document.querySelectorAll('[data-confirm-check]'));
+        if (checks.some(function (c) { return !c.checked; })) { document.getElementById('confirm-error').textContent = '3 項目すべてを確認してください。'; return; }
+        var finish = modalResolve; modalResolve = null; D.closeModal(); if (finish) finish(true);
+      }
+    });
+    document.getElementById('main').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-action]');
+      if (button && activeScreen.click && !D.busy) Promise.resolve(activeScreen.click(button.dataset.action, button, event)).catch(function () { D.toast('操作を完了できませんでした。入力を確認してください。'); });
+    });
+    ['input', 'change', 'submit'].forEach(function (type) {
+      document.getElementById('main').addEventListener(type, function (event) {
+        if (type === 'submit') event.preventDefault();
+        if (activeScreen[type] && !D.busy) Promise.resolve(activeScreen[type](event)).catch(function () { D.toast('入力を確認してください。0 以上の数字が必要です。'); });
+      });
+    });
+    document.addEventListener('keydown', function (event) {
+      var modal = document.querySelector('.modal'), drawer = document.querySelector('.sidebar.open');
+      if (event.key === 'Escape') { if (modal) D.closeModal(); else closeDrawer(); }
+      if (event.key === 'Tab') { if (modal) trap(event, modal); else if (drawer) trap(event, drawer); }
+      var tab = event.target.closest('[role="tab"]');
+      if (tab && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        var tabs = Array.from(tab.parentElement.querySelectorAll('[role="tab"]')), index = tabs.indexOf(tab);
+        var next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        tabs[next].click();
+      }
+    });
+  });
+}());
