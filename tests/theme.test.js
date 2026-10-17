@@ -1,0 +1,20 @@
+'use strict';
+var assert = require('assert'), fs = require('fs'), path = require('path');
+var T = require('../assets/js/theme.js'), css = fs.readFileSync(path.join(__dirname, '../assets/css/app.css'), 'utf8');
+function tokens(block) { var result = {}; Array.from(block.matchAll(/--([\w-]+):([^;]+);/g)).forEach(function (m) { result[m[1]] = m[2]; }); return result; }
+var light = tokens(css.match(/^:root\{([^}]+)\}/)[1]);
+var dark = tokens(css.match(/:root\[data-theme="dark"\]\{([^}]+)\}/)[1]);
+var system = tokens(css.match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{([^}]+)\}/)[1]);
+assert.deepStrictEqual(Object.keys(light).sort(), Object.keys(dark).sort());
+assert.deepStrictEqual(dark, system);
+assert.strictEqual(light.background, '#fbfaf9'); assert.strictEqual(dark.background, '#0d0c0a');
+assert(/body\{[^}]*background:var\(--(?:bg|background)\)/.test(css));
+assert(css.includes('color-scheme:light')); assert(css.includes('color-scheme:dark'));
+var saved = {}, storage = { getItem: function (k) { return saved[k]; }, setItem: function (k, v) { saved[k] = v; } };
+assert.strictEqual(T.restore(storage, false), 'light'); assert.strictEqual(T.restore(storage, true), 'dark');
+assert.strictEqual(T.toggle('light', storage), 'dark'); assert.strictEqual(T.restore(storage, false), 'dark');
+assert.strictEqual(T.toggle('dark', storage), 'light'); assert.strictEqual(T.restore(storage, true), 'light');
+var broken = { getItem: function () { throw Error('blocked'); }, setItem: function () { throw Error('blocked'); } };
+assert.strictEqual(T.restore(broken, true), 'dark'); assert.strictEqual(T.toggle('light', broken), 'dark');
+assert.strictEqual(T.toggle('dark', null), 'light');
+console.log('Theme token parity, system fallback, toggle, persistence and storage exception checks passed.');

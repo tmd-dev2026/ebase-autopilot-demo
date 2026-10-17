@@ -1,14 +1,15 @@
 (function () {
   'use strict';
-  var D = window.Demo, storageKey = 'ebase-autopilot-demo-v1', screens = {}, activeScreen;
+  var D = window.Demo, storageKey = 'ebase-autopilot-demo-v2', screens = {}, activeScreen;
   var modalReturn = null, modalResolve = null, toastTimer, drawerReturn;
   D.state = D.initialState();
   try {
     var saved = JSON.parse(localStorage.getItem(storageKey));
-    if (saved && saved.version === 1 && ['products', 'listings', 'orders', 'messages', 'templates', 'offers', 'report', 'shipping'].every(function (k) { return Array.isArray(saved[k]); }) && saved.events && saved.profitInputs) {
+    if (saved && saved.version === 2 && ['products', 'listings', 'orders', 'messages', 'templates', 'offers', 'report', 'shipping'].every(function (k) { return Array.isArray(saved[k]); }) && saved.events && saved.profitInputs) {
       D.state = Object.assign(D.initialState(), saved);
     }
   } catch (error) { /* The in-memory state remains fully usable. */ }
+  D.state.jobs.forEach(function (job) { if (job.status === 'running') { job.status = 'cancelled'; job.detail = ''; } });
   D.save = function () { try { localStorage.setItem(storageKey, JSON.stringify(D.state)); } catch (error) { /* Memory fallback. */ } };
   D.esc = function (value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   D.yen = function (value) { var rounded = Math.round(value); return (rounded < 0 ? '-¥' : '¥') + Math.abs(rounded).toLocaleString('ja-JP'); };
@@ -20,12 +21,14 @@
   D.heading = function (title, subtitle, eyebrow) { return '<header class="page-heading"><div><div class="eyebrow">' + D.esc(eyebrow || 'DEMO WORKSPACE') + '</div><h1>' + D.esc(title) + '</h1><p>' + D.esc(subtitle || '') + '</p></div><span class="badge">体験版</span></header>'; };
   D.note = function (text) { return '<aside class="real-note"><div><strong>本物ではここが自動でこうなります</strong><p>' + D.esc(text) + '</p></div></aside>'; };
   D.empty = function (text, link, label) { return '<div class="card empty"><h3>' + D.esc(text) + '</h3><p>左のメニューからも自由に体験できます。</p>' + (link ? '<a class="button" href="#/' + link + '">' + D.esc(label) + '</a>' : '') + '</div>'; };
-  D.image = function (p, small) { return '<img class="' + (small ? 'product-thumb' : 'product-image') + '" src="assets/img/' + p.image + '" alt="' + D.esc(p.name) + 'の自作イラスト">'; };
+  D.image = function (p, small) { return '<img class="' + (small ? 'product-thumb' : 'product-image') + '" src="assets/img/' + p.image + '" alt="' + D.esc(p.name) + 'のデモ画像">'; };
+  D.marketLink = function (attrs) { return '<a href="' + D.esc(window.DemoConfig.marketUrl) + '" target="_blank" rel="noopener" data-market ' + (attrs || '') + '>架空フリマ『eBaseマーケット(デモ)』を別タブで開く</a>'; };
+  D.productUrl = function (p) { return window.DemoConfig.marketUrl.replace(/\/?$/, '/') + 'items/' + p.slug + '.html'; };
   D.live = function () { return D.state.listings.filter(function (l) { return l.status === 'live'; }); };
   D.selected = function () { return D.product(D.state.selected) || D.data.products[0]; };
   D.profitValues = function (id) {
     var p = D.product(id) || D.selected();
-    return Object.assign({ sale: p.sale, cost: p.cost, weight: p.weight, rate: 155, buyerShipping: 0, carrier: 'SpeedPAK' }, D.state.profitInputs[p.id]);
+    return Object.assign({ sale: p.sale, cost: p.cost, weight: p.weightKg, rate: 155, buyerShipping: 0, carrier: 'SpeedPAK' }, D.state.profitInputs[p.id]);
   };
   D.listingProfit = function (listing, sale) {
     var quotes = window.DemoCalc.shippingRates(listing.weight), quote = quotes.find(function (q) { return q.carrier === listing.carrier; }) || quotes[0];
@@ -45,7 +48,7 @@
   };
   D.closeModal = function () {
     document.getElementById('modal-root').innerHTML = ''; document.body.classList.remove('modal-open');
-    if (modalReturn && modalReturn.isConnected) modalReturn.focus(); else document.getElementById('main').focus();
+    if (modalReturn && modalReturn.isConnected) modalReturn.focus(); else document.getElementById('main').focus({ preventScroll: true });
     modalReturn = null;
     if (modalResolve) { var finish = modalResolve; modalResolve = null; finish(false); }
   };
@@ -79,19 +82,27 @@
     D.closeModal(); D.busy = false; return true;
   };
   var menu = [
-    ['仕入れ・出品', [['dashboard', 'ダッシュボード'], ['products', 'AI出品'], ['profit', '利益計算'], ['listings', '出品管理'], ['monitor', '在庫監視']]],
-    ['売れた後', [['orders', '注文管理'], ['messages', 'メッセージ']]],
-    ['売上を伸ばす・お金', [['watchers', 'ウォッチャー分析'], ['offers', 'オファー'], ['auto-list', '自動出品設定'], ['profit-report', '収益管理'], ['shipping', '送料管理']]]
+    ['仕入れ・出品', [['products', 'AI出品'], ['listings', '出品管理'], ['monitor', '在庫監視']]],
+    ['販売・利益', [['orders', '注文管理'], ['profit', '利益計算'], ['profit-report', '収益管理'], ['shipping', '送料管理']]],
+    ['成長', [['watchers', 'ウォッチャー分析'], ['offers', 'オファー'], ['auto-list', '自動出品設定']]],
+    ['サポート', [['messages', 'メッセージ']]]
   ];
+  var navOpen = {};
   function navLink(route, label) {
     var unread = D.state.messages.filter(function (m) { return !m.read; }).length;
     return '<a class="nav-link' + (D.route === route ? ' active' : '') + '" ' + (D.route === route ? 'aria-current="page" ' : '') + 'href="#/' + route + '">' + label + (route === 'messages' && unread ? '<span class="badge">' + unread + '</span>' : '') + '</a>';
   }
   D.navigation = function () {
-    document.getElementById('navigation').innerHTML = navLink('welcome', 'はじめに') + '<a class="nav-link" href="market/index.html" target="_blank" rel="noopener" data-market>仕入れ先（架空フリマ）を開く ↗</a>' + menu.map(function (group) { return '<div class="nav-group">' + group[0] + '</div>' + group[1].map(function (m) { return navLink(m[0], m[1]); }).join(''); }).join('') + navLink('summary', '体験のまとめ');
+    document.getElementById('navigation').innerHTML = navLink('welcome', 'はじめに') + navLink('dashboard', 'ダッシュボード') + menu.map(function (group, i) {
+      var current = group[1].some(function (m) { return m[0] === D.route || (m[0] === 'products' && D.route === 'ai-process'); });
+      return '<details data-nav-group="' + i + '"' + (current || navOpen[i] !== false ? ' open' : '') + '><summary>' + group[0] + '</summary>' + group[1].map(function (m) { return navLink(m[0], m[1]); }).join('') + '</details>';
+    }).join('') + navLink('summary', '体験のまとめ');
+    document.querySelectorAll('[data-nav-group]').forEach(function (el) { el.addEventListener('toggle', function () { navOpen[el.dataset.navGroup] = el.open; }); });
   };
   D.render = function () {
     var route = location.hash.replace(/^#\//, '') || 'welcome';
+    var parts = route.split('/');
+    if (parts[0] === 'ai-process' && D.product(parts[1])) { D.state.selected = parts[1]; route = 'ai-process'; }
     if (!screens[route]) route = 'welcome';
     D.route = route; activeScreen = screens[route];
     if (route === 'profit') D.event('profitSeen');
@@ -118,8 +129,27 @@
     else if (!event.shiftKey && (document.activeElement === last || document.activeElement === container)) { event.preventDefault(); first.focus(); }
   }
   document.addEventListener('DOMContentLoaded', function () {
-    D.render();
-    window.addEventListener('hashchange', function () { if (document.querySelector('.modal')) D.closeModal(); closeDrawer(); D.render(); document.getElementById('main').focus(); });
+    var systemTheme = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    function themeButton() {
+      var dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && systemTheme && systemTheme.matches);
+      var button = document.getElementById('theme-toggle');
+      button.textContent = dark ? '☀' : '☾'; button.setAttribute('aria-pressed', String(!!dark));
+      button.setAttribute('aria-label', dark ? 'ライトモードに切り替える' : 'ダークモードに切り替える');
+    }
+    themeButton();
+    document.getElementById('theme-toggle').addEventListener('click', function () {
+      var current = this.getAttribute('aria-pressed') === 'true' ? 'dark' : 'light', storage;
+      try { storage = window.localStorage; } catch (error) { storage = null; }
+      document.documentElement.dataset.theme = window.DemoTheme.toggle(current, storage); themeButton();
+    });
+    if (systemTheme && systemTheme.addEventListener) systemTheme.addEventListener('change', themeButton);
+    function renderRoute() {
+      D.render();
+      document.getElementById('main').focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
+    renderRoute();
+    window.addEventListener('hashchange', function () { if (document.querySelector('.modal')) D.closeModal(); closeDrawer(); renderRoute(); });
     document.getElementById('menu-toggle').addEventListener('click', function () {
       drawerReturn = document.activeElement; document.getElementById('sidebar').classList.add('open');
       document.getElementById('drawer-backdrop').hidden = false; this.setAttribute('aria-expanded', 'true'); document.getElementById('menu-close').focus();
@@ -128,16 +158,17 @@
     document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
     document.getElementById('reset-button').addEventListener('click', async function () {
       closeDrawer();
-      if (await D.confirm('最初からやり直す', '<p>このブラウザに保存した体験の操作を初期化し、最初のダミー出品 2 件に戻します。</p>')) {
+      if (D.working) { D.toast('処理が終わってから初期化してください'); return; }
+      if (await D.confirm('最初からやり直す', '<p>このブラウザに保存した体験の操作を初期化し、初期の見本データに戻します。テーマ設定は保持します。</p>')) {
         D.state = D.initialState(); D.save(); D.go('welcome'); D.toast('体験を初期化しました');
       }
     });
     document.addEventListener('click', function (event) {
-      if (event.target.closest('.skip-link')) { event.preventDefault(); document.getElementById('main').focus(); return; }
+      if (event.target.closest('.skip-link')) { event.preventDefault(); document.getElementById('main').focus({ preventScroll: true }); return; }
       var market = event.target.closest('[data-market]');
       if (market) { D.state.marketOpened = true; D.state.started = true; D.refreshGuide(); }
       var other = event.target.closest('[data-other-products]');
-      if (other) { D.state.selected = 'item-1'; D.state.urlInvalid = true; D.state.aiOpen = false; D.save(); if (D.route === 'products') D.render(); if (document.querySelector('.modal')) D.closeModal(); }
+      if (other) { D.state.selected = 'holo-card'; D.state.urlInvalid = true; D.state.aiOpen = false; D.save(); if (D.route === 'products') D.render(); if (document.querySelector('.modal')) D.closeModal(); }
       if (event.target.closest('[data-modal-close]')) D.closeModal();
       if (event.target.closest('[data-modal-confirm]')) {
         var checks = Array.from(document.querySelectorAll('[data-confirm-check]'));
@@ -147,12 +178,12 @@
     });
     document.getElementById('main').addEventListener('click', function (event) {
       var button = event.target.closest('[data-action]');
-      if (button && activeScreen.click && !D.busy) Promise.resolve(activeScreen.click(button.dataset.action, button, event)).catch(function () { D.toast('操作を完了できませんでした。入力を確認してください。'); });
+      if (button && activeScreen.click && !D.busy && !D.working) Promise.resolve(activeScreen.click(button.dataset.action, button, event)).catch(function () { D.toast('操作を完了できませんでした。入力を確認してください。'); });
     });
     ['input', 'change', 'submit'].forEach(function (type) {
       document.getElementById('main').addEventListener(type, function (event) {
         if (type === 'submit') event.preventDefault();
-        if (activeScreen[type] && !D.busy) Promise.resolve(activeScreen[type](event)).catch(function () { D.toast('入力を確認してください。0 以上の数字が必要です。'); });
+        if (activeScreen[type] && !D.busy && !D.working) Promise.resolve(activeScreen[type](event)).catch(function () { D.toast('入力を確認してください。0 以上の数字が必要です。'); });
       });
     });
     document.addEventListener('keydown', function (event) {

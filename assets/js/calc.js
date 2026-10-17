@@ -1,5 +1,6 @@
 (function (root) {
   'use strict';
+  var products = (typeof module !== 'undefined' && module.exports ? require('./products-data.js') : root.DemoProducts).products;
   function number(value, fallback) {
     var n = value === undefined ? fallback : Number(value);
     if (!Number.isFinite(n) || n < 0) throw new RangeError('0 以上の有限の数を入力してください');
@@ -38,13 +39,14 @@
         if (!candidate.startsWith('/') || candidate.startsWith('//')) continue;
         path = candidate.split(/[?#]/)[0];
       }
-      var match = path.match(/\/market\/(item-[123])(?:\.html)?\/?$/);
-      if (match) return match[1];
+      var match = path.match(/\/items\/([^/]+?)(?:\.html)?\/?$/);
+      var product = match && products.find(function (p) { return p.slug === match[1]; });
+      if (product) return product.id;
     }
     return null;
   }
   function checkListable(product) {
-    var blocked = !product || product.id === 'item-3' || product.productId === 'item-3' ||
+    var blocked = !product || product.listable === false || product.id === 'shoulder-bag' || product.productId === 'shoulder-bag' ||
       (product.brandLogo === true && product.authenticityProof !== true);
     return blocked ? { ok: false, reasons: [
       '偽造品や無許可のコピー品の出品は禁止です。出品者が本物と確認できる必要があります。',

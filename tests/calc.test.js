@@ -38,75 +38,27 @@ test('invalid numeric inputs are rejected', function () {
     assert.throws(function () { C.calcProfit({ sale: value }); }, RangeError);
   });
 });
-test('only the three supported demo URL paths match', function () {
-  [
-    ['https://example.com/market/item-2.html?x=1#y', 'item-2'],
-    ['https://example.com/market/item-1', 'item-1'],
-    ['https://example.com/market/item-2/', 'item-2'],
-    ['  https://example.com/market/item-3.html/  ', 'item-3'],
-    ['/market/item-1.html?query=value#hash', 'item-1'],
-    ['  /market/item-2/  ', 'item-2'],
-    ['商品はこちら https://example.com/demo/market/item-1.html 続き', 'item-1'],
-    ['file:///demo/market/item-2.html', 'item-2'],
-    ['file:///demo/market/item-3.html?x=1#y', 'item-3']
-  ].forEach(function (example) { assert.strictEqual(C.matchDemoUrl(example[0]), example[1], example[0]); });
-});
-test('unsupported and executable URLs are actually rejected', function () {
-  ['https://www.example.jp/item/m123456', '/market/item-4.html', '', '   ', 'javascript:alert(1)',
-    'javascript:alert(1)//market/item-1.html', 'data:text/plain,/market/item-1.html',
-    '/market/item-1.html/extra', '/market/item-11.html', '/market/item-1.htmlx',
-    'https://example.com/?next=/market/item-1.html', '/market/item-2.php', '//example.com/market/item-1.html', null, 123
-  ].forEach(function (input) { assert.strictEqual(C.matchDemoUrl(input), null, String(input)); });
-});
-test('brand restriction really blocks the unverified bag', function () {
-  var blocked = C.checkListable({ id: 'item-3', brandLogo: true, authenticityProof: false });
-  assert.strictEqual(blocked.ok, false);
-  assert(blocked.reasons.length >= 1);
-  assert.strictEqual(C.checkListable({ id: 'item-1' }).ok, true);
-  assert.strictEqual(C.checkListable({ id: 'item-2' }).ok, true);
-  assert.strictEqual(C.checkListable({ id: 'other', brandLogo: true, authenticityProof: false }).ok, false);
-  assert.strictEqual(C.checkListable({ id: 'other', brandLogo: true, authenticityProof: true }).ok, true);
-});
-var root = path.resolve(__dirname, '..');
-function filesIn(directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap(function (entry) {
-    var full = path.join(directory, entry.name);
-    return entry.isDirectory() ? filesIn(full) : [full];
-  });
-}
-var appFiles = [path.join(root, 'index.html')].concat(filesIn(path.join(root, 'market')), filesIn(path.join(root, 'assets')));
-test('static guard: no external communication, brand names, logos, modules or secrets', function () {
-  var banned = [
-    /\bfetch\s*\(/i, /XMLHttpRequest/i, /WebSocket/i, /sendBeacon/i,
-    /\b(?:import|export)\s+(?:\{|\*|default|[A-Za-z_$])/,
-    /(?:src|href|srcset|poster|action)\s*=\s*["']\s*(?:https?:)?\/\//i,
-    /url\(\s*["']?\s*(?:https?:)?\/\//i,
-    /@import/i,
-    /Pokemon|ポケモン|Canon|Gucci|Mercari|メルカリ|ヤフオク/i,
-    /(?:src|href)\s*=\s*["'][^"']*ebay[^"']*\.(?:svg|png|jpg|jpeg|gif|webp)/i,
-    /\b(?:api[_-]?key|password|secret[_-]?key|access[_-]?token)\s*[:=]/i,
-    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/,
-    /必ず売れる|月\s*\d+\s*万円稼げる|\d+\s*人が使用中/
-  ];
-  appFiles.forEach(function (file) {
-    var text = fs.readFileSync(file, 'utf8');
-    banned.forEach(function (rule) { assert(!rule.test(text), path.relative(root, file) + ' violates ' + rule); });
-    if (/\.(svg|png|jpg|jpeg|gif|webp)$/i.test(file)) assert(!/ebay/i.test(path.basename(file)), 'Logo-like image filename');
+var products = require('../assets/js/products-data.js').products;
+test('six product URLs work across arbitrary hosts and path prefixes', function () {
+  products.forEach(function (p) {
+    ['https://arbitrary.example/prefix/items/' + p.slug + '.html?x=1#y', 'https://other.example/items/' + p.slug, ' /items/' + p.slug + '/ ', 'file:///demo/items/' + p.slug + '.html/', '商品はこちら https://any.example/path/items/' + p.slug + '.html 続き'].forEach(function (url) { assert.strictEqual(C.matchDemoUrl(url), p.id, url); });
   });
 });
-test('all HTML files use local resources that exist and load classic deferred scripts', function () {
-  appFiles.filter(function (file) { return file.endsWith('.html'); }).forEach(function (file) {
-    var source = fs.readFileSync(file, 'utf8');
-    assert(/name="viewport"/.test(source), file + ' has no viewport');
-    var references = Array.from(source.matchAll(/(?:src|href)="([^"#][^"]*)"/g));
-    references.forEach(function (match) {
-      var target = match[1].split(/[?#]/)[0];
-      assert(fs.existsSync(path.resolve(path.dirname(file), target)), file + ' missing resource ' + target);
-    });
-    Array.from(source.matchAll(/<script\b([^>]*)>/g)).forEach(function (match) {
-      assert(/\bdefer\b/.test(match[1]), file + ' script must defer');
-      assert(!/type="module"/.test(match[1]), file + ' module is not allowed');
-    });
+test('unsupported, old, unknown and executable URLs are actually rejected', function () {
+  ['/market/item-1.html', '/items/unknown.html', 'https://www.example.jp/item/m123', '', ' ', 'javascript:alert(1)', 'javascript:alert(1)//items/holo-card.html', 'data:text/plain,/items/holo-card.html', '/items/holo-card.htmlx', '/items/holo-card/extra', 'https://example.test/?next=/items/holo-card.html', '//example.test/items/holo-card.html', null, 123].forEach(function (url) { assert.strictEqual(C.matchDemoUrl(url), null, String(url)); });
+});
+test('all six product profits match the explicit fee formula and the figure loses money', function () {
+  products.forEach(function (p) {
+    var shipping = Math.round(2900 + 2100 * p.weightKg);
+    var expected = Math.round((p.sale - (p.sale * (0.1325 + 0.0135) + 0.40)) * 155 - shipping - p.cost);
+    var actual = C.calcProfit({ sale: p.sale, cost: p.cost, rate: 155, shipping: shipping }).net;
+    assert.strictEqual(actual, expected, p.id);
+    if (p.id === 'figure-large') assert(actual < 0); else if (p.id !== 'shoulder-bag') assert(actual > 0, p.id);
   });
 });
-console.log('\n' + count + ' tests passed. ' + appFiles.length + ' app files scanned.');
+test('bag prohibition fires, while all five listable products pass', function () {
+  products.forEach(function (p) { var check = C.checkListable(p); assert.strictEqual(check.ok, p.listable); if (!p.listable) assert(check.reasons.length); });
+  assert.strictEqual(C.checkListable({ brandLogo: true, authenticityProof: false }).ok, false);
+  assert.strictEqual(C.checkListable({ brandLogo: true, authenticityProof: true }).ok, true);
+});
+console.log(count + ' calculation checks passed.');

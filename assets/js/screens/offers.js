@@ -3,7 +3,7 @@
   var D = window.Demo;
   function offerSummary(l, discount) {
     var sale = Math.round(l.sale * (1 - discount / 100) * 100) / 100, r = D.listingProfit(l, sale);
-    return '<p>割引後の価格（例）: <strong>' + D.usd(sale) + '</strong></p><p class="' + (r.net < 0 ? 'danger-box' : 'success-box') + '"><strong>' + (r.net < 0 ? '警告: 赤字 ' : '見込みの手残り ') + D.yen(r.net) + '（例）</strong>' + (r.net < 0 ? '<br>この割引では赤字になります。割引率と費用を見直してください。' : '') + '</p><small>出品時の仕入れ・重さ・為替・運送会社から再計算しています。</small>';
+    return '<p>割引後の価格（例）: <strong>' + D.usd(sale) + '</strong></p><p class="' + (r.net < 0 ? 'warning-box negative' : 'success-box positive') + '"><strong>' + (r.net < 0 ? '警告: 赤字 ' : '見込みの手残り（黒字） ') + D.yen(r.net) + '（例）</strong>' + (r.net < 0 ? '<br>この割引では赤字になります。割引率と費用を見直してください。' : '') + '</p><small>出品時の仕入れ・重さ・為替・運送会社から再計算しています。</small>';
   }
   D.register('offers', {
     render: function () {

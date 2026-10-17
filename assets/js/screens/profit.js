@@ -5,7 +5,7 @@
     var rates = C.shippingRates(values.weight);
     var selected = rates.find(function (q) { return q.carrier === values.carrier; }) || rates[0];
     var net = rates.map(function (r) { return C.calcProfit(Object.assign({}, values, { shipping: r.price })).net; });
-    return '<div class="grid two"><article class="card"><h2>手残りの内訳（例）</h2>' + D.formula(Object.assign({}, values, { shipping: selected.price })) + '<p class="field-note">手残りは売上から手数料・送料・仕入れを引いた額です。プラスでも、追加の費用がないか確認しましょう。</p></article><article class="card"><h2>国際送料を比較</h2><p class="muted">料金は例です。実際の料金表ではありません。</p><div class="stack">' + rates.map(function (r, i) { return '<div><div class="row between"><strong>' + r.carrier + '（例）</strong>' + (net[i] === Math.max.apply(null, net) ? '<span class="badge success">手残りが最大</span>' : '') + '</div><p>送料 ' + D.yen(r.price) + ' / <span class="' + (net[i] < 0 ? 'negative' : 'positive') + '">' + (net[i] < 0 ? '赤字 ' : '手残り ') + D.yen(net[i]) + '</span></p></div>'; }).join('') + '</div><small>重さ kg から算出: SpeedPAK = round(2900 + 2100 × kg)、EMS = round(3300 + 2800 × kg)、DHL = round(4200 + 3100 × kg)</small></article></div>';
+    return '<div class="grid two"><article class="card"><h2>手残りの内訳（例）</h2>' + D.formula(Object.assign({}, values, { shipping: selected.price })) + '<p class="field-note">手残りは売上から手数料・送料・仕入れを引いた額です。プラスでも、追加の費用がないか確認しましょう。</p></article><article class="card"><h2>国際送料を比較</h2><p class="muted">料金は例です。実際の料金表ではありません。</p><div class="stack">' + rates.map(function (r, i) { return '<div><div class="row between"><strong>' + r.carrier + '（例）</strong>' + (net[i] === Math.max.apply(null, net) ? '<span class="badge success">手残りが最大</span>' : '') + '</div><p>送料 ' + D.yen(r.price) + ' / <span class="' + (net[i] < 0 ? 'negative' : 'positive') + '">' + (net[i] < 0 ? '赤字 ' : '黒字 ') + D.yen(net[i]) + '</span></p></div>'; }).join('') + '</div><small>重さ kg から算出: SpeedPAK = round(2900 + 2100 × kg)、EMS = round(3300 + 2800 × kg)、DHL = round(4200 + 3100 × kg)</small></article></div>';
   }
   D.register('profit', {
     render: function () {
@@ -19,7 +19,14 @@
       if (!form.checkValidity()) { document.getElementById('profit-error').textContent = '0 以上の数字を入力してください。計算結果は直前の有効な入力です。'; return; }
       var values = {};
       new FormData(form).forEach(function (value, key) { values[key] = key === 'carrier' ? value : Number(value); });
-      D.state.profitInputs[D.state.selected] = values; D.save();
+      D.state.profitInputs[D.state.selected] = values;
+      var item = D.state.products.find(function (it) { return it.id === D.state.selected; });
+      if (item && item.priceSet) {
+        var quote = C.shippingRates(values.weight).find(function (q) { return q.carrier === values.carrier; });
+        item.net = C.calcProfit(Object.assign({}, values, { shipping: quote.price })).net;
+        item.lossWarning = item.net < 0; item.lossAcknowledged = false; item.ready = !item.lossWarning && !item.blocked;
+      }
+      D.save();
       document.getElementById('profit-error').textContent = ''; document.getElementById('profit-results').innerHTML = results(values);
     },
     change: function (event) {
