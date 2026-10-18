@@ -56,9 +56,12 @@ test('all six product profits match the explicit fee formula and the figure lose
     if (p.id === 'figure-large') assert(actual < 0); else if (p.id !== 'shoulder-bag') assert(actual > 0, p.id);
   });
 });
-test('bag prohibition fires, while all five listable products pass', function () {
-  products.forEach(function (p) { var check = C.checkListable(p); assert.strictEqual(check.ok, p.listable); if (!p.listable) assert(check.reasons.length); });
-  assert.strictEqual(C.checkListable({ brandLogo: true, authenticityProof: false }).ok, false);
-  assert.strictEqual(C.checkListable({ brandLogo: true, authenticityProof: true }).ok, true);
+test('all six products have valid listing fields and validation rejects bad edits', function () {
+  products.forEach(function (p) { assert.deepStrictEqual(C.validateListing({ title: p.ai.titleEn, description: p.ai.descriptionEn.join('\n'), category: p.ai.category, condition: p.ai.conditionEn, specifics: p.ai.specifics }), []); });
+  var good = { title: 'Example', description: 'Example description', category: 'Cards', condition: 'Used', specifics: [['Brand', 'Unbranded']] };
+  assert(C.validateListing(Object.assign({}, good, { title: 'A'.repeat(81) })).some(function (error) { return error.includes('80'); }));
+  ['title', 'description', 'category', 'condition'].forEach(function (field) { var item = Object.assign({}, good); item[field] = ' '; assert(C.validateListing(item).length > 0); });
+  assert(C.validateListing(Object.assign({}, good, { specifics: [['Brand', '']] })).length > 0);
 });
+
 console.log(count + ' calculation checks passed.');

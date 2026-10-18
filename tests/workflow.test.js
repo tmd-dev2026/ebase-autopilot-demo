@@ -8,7 +8,7 @@ var root = path.resolve(__dirname, '..');
 var hashListeners = [];
 var nodes = {}, storage = {}, storageBlocked = false, registered = {}, modal, toast;
 function node(id) {
-  if (!nodes[id]) nodes[id] = { innerHTML: '', textContent: '', value: '', focus: function () {}, classList: { add: function () {}, remove: function () {} } };
+  if (!nodes[id]) nodes[id] = { innerHTML: '', textContent: '', value: '', focus: function () {}, addEventListener: function (type, callback) { this[type] = callback; }, classList: { add: function () {}, remove: function () {} } };
   return nodes[id];
 }
 var context = vm.createContext({
@@ -33,7 +33,8 @@ D.register = function (route, screen) { registered[route] = screen; register(rou
 fs.readdirSync(path.join(root, 'assets/js/screens')).filter(function (name) { return name.endsWith('.js'); }).forEach(function (name) { load('assets/js/screens/' + name); });
 D.toast = function (message) { toast = message; };
 D.modal = function (title, content) { modal = { title: title, content: content }; };
-D.confirm = async function (title, content, labels) { if (title === '出品前の最終確認') assert.strictEqual(labels.length, 3); return true; };
+var confirmations = [];
+D.confirm = async function (title) { confirmations.push(title); return true; };
 D.loading = async function (title, steps, duration) { assert(steps.length >= 2); assert(duration >= 500 && duration <= 1000); return true; };
 function visit(route) { context.location.hash = '#/' + route; D.render(); }
 function form(values, extras) { return Object.assign({ values: values, matches: function () { return true; }, reportValidity: function () { return true; } }, extras); }
@@ -46,8 +47,8 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert.strictEqual(D.yen(2138), '¥2,138');
     assert.strictEqual(D.yen(-0.1), '¥0');
   });
-  await test('all 15 screens render with an automation note and local initial data', function () {
-    assert.strictEqual(Object.keys(registered).length, 15);
+  await test('all 16 screens render with an automation note and local initial data', function () {
+    assert.strictEqual(Object.keys(registered).length, 16);
     Object.keys(registered).forEach(function (route) {
       var html = registered[route].render();
       assert(html.includes('real-note'), route);
@@ -179,57 +180,144 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert(!registered.shipping.render().includes('DEMO-TRACK-001'));
     assert(registered.summary.render().includes('✓ 体験済み'));
   });
-  await test('bag is blocked by the publish handler itself, even after AI processing', async function () {
+  await test('bag publishes directly after AI processing', async function () {
     visit('products'); node('import-url').value = '/items/shoulder-bag.html';
     await registered.products.submit({ target: { id: 'import-form' } });
-    await registered.products.click('ai-open', button('shoulder-bag'));
-    await registered['ai-process'].click('ai-run', button('shoulder-bag'));
-    assert(registered['ai-process'].render().includes('この商品は出せません'));
-    visit('listings'); var before = D.state.listings.length;
+    assert(registered['ai-process'].render().includes('要修正・注意はありません'));
+    visit('listings'); var before = D.state.listings.length, count = confirmations.length;
     await registered.listings.click('publish', button('shoulder-bag'));
-    assert.strictEqual(D.state.listings.length, before);
-    assert(modal.content.includes('この商品は出せません'));
+    assert.strictEqual(D.state.listings.length, before + 1);
+    assert.strictEqual(confirmations.length, count);
   });
-  await test('auto loss warning and overlong title both block the actual publish handler', async function () {
-    var W = context.window.DemoWorkflow;
-    await W.acquire(D.state, 'figure-large', 'auto', {});
+  await test('auto loss completes and publishes; invalid edits are still rejected', async function () {
+    await context.window.DemoWorkflow.acquire(D.state, 'figure-large', 'auto', {});
     var item = D.state.products.find(function (it) { return it.id === 'figure-large'; });
-    var product = D.data.products.find(function (p) { return p.id === 'figure-large'; });
-    assert.strictEqual(item.title, product.ai.titleEn);
-    assert(item.title.length <= 80);
+    var product = D.product('figure-large');
+    assert(item.ready && item.net < 0);
     visit('ai-process/figure-large');
     var aiHtml = registered['ai-process'].render();
-    var warning = product.ai.warnings.find(function (w) { return w.level === '注意'; });
-    assert(warning, 'the real figure data must include its heavy-item / low-price warning');
-    assert(aiHtml.includes(warning.level));
-    assert(aiHtml.includes(D.esc(warning.text)));
-    assert(!aiHtml.includes('要修正'));
-    var before = D.state.listings.length;
+    assert(aiHtml.includes('要修正・注意はありません'));
+    ['仕入値(USD)', '送料(USD)', 'eBay手数料', '出品価格', '見込み利益', '見込み利益率', '⚠ 赤字'].forEach(function (label) { assert(aiHtml.includes(label), label); });
     var priceHtml = registered.products.render();
-    assert(priceHtml.includes('赤字です。送料と売値を確認してください'));
-    assert(!priceHtml.includes('要修正'));
-    D.state.selected = 'figure-large';
-    var profitHtml = registered.profit.render();
-    assert(profitHtml.includes('赤字'));
-    assert(!profitHtml.includes('要修正'));
-    await registered.listings.click('publish', button('figure-large'));
-    assert.strictEqual(D.state.listings.length, before);
-    assert(toast.includes('赤字'));
-    await registered.products.click('ack-loss', button('figure-large'));
-    assert(item.ready && item.lossAcknowledged);
-    visit('ai-process/figure-large');
-    // Explicit positive control, independent of the product fixture's title.
+    assert(priceHtml.includes('全自動が完了しました:'));
+    assert(priceHtml.includes('⚠ 赤字'));
+    assert(!priceHtml.includes('先へ進む'));
+    assert(registered.profit.render().includes('⚠ 純損失'));
+    var before = D.state.listings.length;
     registered['ai-process'].input({ target: { dataset: { result: 'title' }, value: 'A'.repeat(81) } });
-    assert.strictEqual(item.title.length, 81);
-    assert(registered['ai-process'].render().includes('要修正'));
+    assert(registered['ai-process'].render().includes('要修正(1件)'));
     await registered.listings.click('publish', button('figure-large'));
     assert.strictEqual(D.state.listings.length, before);
     assert(toast.includes('1〜80'));
     registered['ai-process'].input({ target: { dataset: { result: 'title' }, value: product.ai.titleEn } });
-    assert.strictEqual(node('title-validation').textContent, '');
-    assert(!registered['ai-process'].render().includes('要修正'));
+    assert(node('title-validation').innerHTML.includes('要修正・注意はありません'));
+    registered['ai-process'].input({ target: { dataset: { result: 'category' }, value: '' } });
+    await registered.listings.click('publish', button('figure-large'));
+    assert.strictEqual(D.state.listings.length, before);
+    assert(registered['ai-process'].render().includes('必須項目が空'));
+    registered['ai-process'].input({ target: { dataset: { result: 'category' }, value: product.ai.category } });
+    var count = confirmations.length;
     await registered.listings.click('publish', button('figure-large'));
     assert.strictEqual(D.state.listings.length, before + 1);
+    assert.strictEqual(confirmations.length, count);
+  });
+  await test('v3 sidebar, tabs, parent highlighting and shipping disclosure', function () {
+    var state = D.state; D.state = D.initialState();
+    visit('dashboard');
+    var navigation = node('navigation').innerHTML;
+    assert.deepStrictEqual(Array.from(navigation.matchAll(/<summary>(.*?)<\/summary>/g), function (m) { return m[1]; }), ['仕入れ・出品', '販売・利益', '成長', 'サポート']);
+    assert.deepStrictEqual(Array.from(navigation.matchAll(/<a[^>]*>([^<]*)/g), function (m) { return m[1]; }), ['ダッシュボード', 'AI出品', '出品管理', 'その他出品', '販売・収益', '利益計算', 'マーケティング', 'メッセージ']);
+    ['在庫監視', '注文管理', '収益管理', '送料管理', 'ウォッチャー分析', 'オファー', '自動出品設定'].forEach(function (label) { assert(!navigation.includes(label)); });
+    [['auto-list', 'manual-list', 'その他出品'], ['profit-report', 'orders', '販売・収益'], ['shipping', 'orders', '販売・収益'], ['offers', 'watchers', 'マーケティング'], ['monitor', 'listings', '出品管理'], ['ai-process/holo-card', 'products', 'AI出品']].forEach(function (entry) {
+      visit(entry[0]);
+      assert(node('navigation').innerHTML.includes('aria-current="page" href="#/' + entry[1] + '">' + entry[2]));
+    });
+    [['manual-list', '手動出品', '自動出品設定'], ['orders', '注文', '収益'], ['watchers', 'ウォッチャー分析', 'オファー']].forEach(function (entry) {
+      visit(entry[0]); var tabs = node('main').innerHTML.match(/<nav class="page-tabs"[\s\S]*?<\/nav>/)[0];
+      assert(tabs.includes(entry[1]) && tabs.includes(entry[2]));
+      assert(tabs.includes('aria-current="page"'));
+    });
+    visit('profit-report');
+    assert(node('main').innerHTML.includes('<details id="shipping-section" class="card section">'));
+    node('shipping-section').open = true; node('shipping-section').toggle();
+    assert(D.state.shippingOpen && D.state.events.shippingSeen);
+    registered['profit-report'].change({ target: { id: 'shipping-filter', value: 'EMS' } });
+    assert(!D.shippingContent().includes('DEMO-PAST-0'));
+    assert(D.shippingContent().includes('DEMO-PAST-1'));
+    visit('shipping');
+    assert(node('main').innerHTML.includes('<details id="shipping-section" class="card section" open>'));
+    assert(node('main').innerHTML.includes('href="#/profit-report" aria-current="page"'));
+    assert(D.state.events.reportSeen);
+    D.state = state;
+  });
+  await test('priority types, severity ordering, thresholds and all list filters', async function () {
+    var state = D.state; D.state = D.initialState();
+    var W = context.window.DemoWorkflow;
+    for (var p of D.data.products) await W.acquire(D.state, p.id, 'normal', {});
+    D.state.products[0].title = 'A'.repeat(81);
+    D.state.products[1].processed = false; D.state.products[1].aiError = true;
+    D.state.products[2].processed = false;
+    D.state.products[3].priceSet = true;
+    D.state.listings[0].source = 'soldout'; D.state.listings[0].status = 'withdrawn';
+    D.state.listings[1].source = 'deleted'; D.state.listings[1].status = 'withdrawn';
+    D.state.listings[2].status = 'error';
+    var priorities = D.priorities();
+    assert.deepStrictEqual(Array.from(priorities, function (p) { return p.title; }).sort(), ['出品エラー', '仕入れ元が売り切れ・削除', '発送待ちの注文', '出品待ち', '値下げ候補', '価格設定待ち', 'AI処理待ち'].sort());
+    assert(!registered.dashboard.render().includes('メッセージ未読'));
+    assert.strictEqual(priorities.find(function (p) { return p.filter === 'errors'; }).count, 3);
+    function sorted(rows) { rows.forEach(function (p, i) { if (i) assert(rows[i - 1].severity < p.severity || (rows[i - 1].severity === p.severity && rows[i - 1].count >= p.count)); }); }
+    sorted(priorities);
+    assert.strictEqual(priorities.find(function (p) { return p.filter === 'pending'; }).severity, 1);
+    D.state.orders.forEach(function (o) { o.status = 'pending'; });
+    assert.strictEqual(D.priorities().find(function (p) { return p.filter === 'pending'; }).severity, 0);
+    sorted(D.priorities());
+    D.state.dateFilter = 'yesterday';
+    priorities.forEach(function (p) {
+      visit(p.route + '?filter=' + p.filter);
+      assert.strictEqual(D.route, p.route); assert.strictEqual(D.filter, p.filter);
+      var html = node('main').innerHTML;
+      assert(html.includes('絞り込み: ' + p.title));
+      var rows = p.filter === 'markdown' ? (html.match(/data-price-form/g) || []).length : p.filter === 'pending' ? (html.match(/data-shipping-form/g) || []).length : p.filter === 'unavailable' ? (html.match(/<article\b/g) || []).length : p.filter === 'ai-pending' ? (html.match(/class="card product-row"/g) || []).length : (html.match(/<article\b/g) || []).length;
+      assert.strictEqual(rows, p.filter === 'pending' ? 5 : p.count, p.filter);
+      assert(html.includes('href="#/' + p.route + '">すべて表示'));
+    });
+    D.state.products = []; D.state.listings = []; D.state.orders = [];
+    assert.strictEqual(D.priorities().length, 0);
+    assert(registered.dashboard.render().includes('今日やることはありません'));
+    D.state = state;
+  });
+  await test('image-only modal, numerical pricing and direct publishing for all six products', async function () {
+    var state = D.state; D.state = D.initialState();
+    for (var p of D.data.products) {
+      await context.window.DemoWorkflow.acquire(D.state, p.id, 'auto', {});
+      visit('ai-process/' + p.id);
+      var html = node('main').innerHTML, shipping = Math.round(2900 + 2100 * p.weightKg);
+      var expected = Math.round((p.sale - (p.sale * 0.146 + 0.40)) * 155 - shipping - p.cost);
+      assert(html.includes(D.usd(p.cost / 155) + ' / ' + D.yen(p.cost)));
+      assert(html.includes(D.usd(shipping / 155) + ' / ' + D.yen(shipping)));
+      assert(html.includes(D.usd(expected / 155) + ' / ' + D.yen(expected)));
+      assert(html.includes((expected / (p.sale * 155) * 100).toFixed(1) + '%'));
+      var count = confirmations.length;
+      await registered.listings.click('publish', button(p.id));
+      assert(D.state.listings.some(function (l) { return l.own && l.productId === p.id && l.status === 'live'; }));
+      assert.strictEqual(confirmations.length, count);
+    }
+    visit('offers');
+    var figure = D.state.listings.find(function (l) { return l.own && l.productId === 'figure-large'; });
+    var confirmationsBeforeOffer = confirmations.length;
+    await registered.offers.submit({ target: form({ discount: '20' }, { dataset: { id: figure.id } }) });
+    assert.strictEqual(D.state.offers.length, 1);
+    assert.strictEqual(confirmations.length, confirmationsBeforeOffer);
+    visit('products');
+    assert(!node('main').innerHTML.includes('>詳細</button>'));
+    await registered.products.click('images', button('holo-card'));
+    assert.strictEqual(modal.title, '商品画像');
+    assert.strictEqual((modal.content.match(/data-gallery=/g) || []).length, 4);
+    assert(!modal.content.includes('<table>'));
+    D.product('holo-card').images.forEach(function (img) { assert(modal.content.includes(D.esc(img.caption))); });
+    visit('profit');
+    ['送料(円)', '送料(USD)', '備考', '手残り', '収入', '控除'].forEach(function (label) { assert(node('main').innerHTML.includes(label)); });
+    D.state = state;
   });
   await test('search filters, CSV stub, local persistence and memory fallback', function () {
     visit('monitor');
@@ -237,7 +325,7 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert(registered.monitor.render().includes('監視条件に一致する見本: 1 件'));
     registered['profit-report'].click('csv', button(''));
     assert.strictEqual(toast, '体験版ではダウンロードしません');
-    D.save(); var saved = JSON.parse(storage['ebase-autopilot-demo-v2']);
+    D.save(); var saved = JSON.parse(storage['ebase-autopilot-demo-v3']);
     assert.strictEqual(saved.orders.length, 6);
     assert.strictEqual(saved.events.replied, true);
     storageBlocked = true;

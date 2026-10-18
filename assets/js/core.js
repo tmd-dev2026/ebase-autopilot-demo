@@ -1,11 +1,11 @@
 (function () {
   'use strict';
-  var D = window.Demo, storageKey = 'ebase-autopilot-demo-v2', screens = {}, activeScreen;
+  var D = window.Demo, storageKey = 'ebase-autopilot-demo-v3', screens = {}, activeScreen;
   var modalReturn = null, modalResolve = null, toastTimer, drawerReturn;
   D.state = D.initialState();
   try {
     var saved = JSON.parse(localStorage.getItem(storageKey));
-    if (saved && saved.version === 2 && ['products', 'listings', 'orders', 'messages', 'templates', 'offers', 'report', 'shipping'].every(function (k) { return Array.isArray(saved[k]); }) && saved.events && saved.profitInputs) {
+    if (saved && saved.version === 3 && ['products', 'listings', 'orders', 'messages', 'templates', 'offers', 'report', 'shipping'].every(function (k) { return Array.isArray(saved[k]); }) && saved.events && saved.profitInputs) {
       D.state = Object.assign(D.initialState(), saved);
     }
   } catch (error) { /* The in-memory state remains fully usable. */ }
@@ -15,6 +15,7 @@
   D.yen = function (value) { var rounded = Math.round(value); return (rounded < 0 ? '-¥' : '¥') + Math.abs(rounded).toLocaleString('ja-JP'); };
   D.usd = function (value) { return '$' + Number(value).toFixed(2); };
   D.id = function (prefix) { return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); };
+  D.screens = screens;
   D.register = function (route, screen) { screens[route] = screen; };
   D.go = function (route) { if (location.hash === '#/' + route) D.render(); else location.hash = '#/' + route; };
   D.event = function (name) { D.state.events[name] = true; D.save(); };
@@ -37,10 +38,6 @@
   D.formula = function (input) {
     var r = window.DemoCalc.calcProfit(input);
     return '<dl class="formula"><div><dt>売値 ' + D.usd(input.sale) + ' + 買い手送料 ' + D.usd(input.buyerShipping || 0) + '<br>× 為替 ' + input.rate + ' 円/USD（例）</dt><dd>' + D.yen(r.revenueYen) + '</dd></div><div><dt>− 手数料<br><small>粗額 × (13.25% + 1.35%) + $0.40</small></dt><dd>' + D.yen(r.feeYen) + '</dd></div><div><dt>− 国際送料</dt><dd>' + D.yen(r.shipping) + '</dd></div><div><dt>− 仕入れ</dt><dd>' + D.yen(r.cost) + '</dd></div>' + (r.domestic || r.ads ? '<div><dt>− 国内送料 / 広告費</dt><dd>' + D.yen(r.domestic) + ' / ' + D.yen(r.ads) + '</dd></div>' : '') + '<div class="total"><dt>手残り（例）</dt><dd class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + (r.net < 0 ? '赤字 ' : '黒字 ') + D.yen(r.net) + '</dd></div></dl><small>円表示は四捨五入。手残りは丸め前の手数料から計算します。</small>';
-  };
-  D.blocked = function (p) {
-    var check = window.DemoCalc.checkListable(p);
-    return '<div class="danger-box"><h3>この商品は出せません</h3><p>この例では保証書や購入証明がなく、本物と確認できないため出品を止めます。本物と証明できる商品の一律禁止を意味しません。</p><ul>' + check.reasons.map(function (r) { return '<li>' + D.esc(r) + '</li>'; }).join('') + '</ul><p>違反時は、出品の削除、警告、アクティビティの制限、アカウント停止の措置になり得ます。</p><a class="button" href="#/products" data-other-products>他の商品で試す</a></div>';
   };
   D.toast = function (text) {
     clearTimeout(toastTimer); document.getElementById('toast').textContent = text;
@@ -82,25 +79,51 @@
     D.closeModal(); D.busy = false; return true;
   };
   var menu = [
-    ['仕入れ・出品', [['products', 'AI出品'], ['listings', '出品管理'], ['monitor', '在庫監視']]],
-    ['販売・利益', [['orders', '注文管理'], ['profit', '利益計算'], ['profit-report', '収益管理'], ['shipping', '送料管理']]],
-    ['成長', [['watchers', 'ウォッチャー分析'], ['offers', 'オファー'], ['auto-list', '自動出品設定']]],
+    ['仕入れ・出品', [['products', 'AI出品'], ['listings', '出品管理'], ['manual-list', 'その他出品']]],
+    ['販売・利益', [['orders', '販売・収益'], ['profit', '利益計算']]],
+    ['成長', [['watchers', 'マーケティング']]],
     ['サポート', [['messages', 'メッセージ']]]
   ];
+  function parentRoute(route) {
+    return { 'ai-process': 'products', monitor: 'listings', 'auto-list': 'manual-list', 'profit-report': 'orders', shipping: 'orders', offers: 'watchers' }[route] || route;
+  }
+  D.tabs = function (group, current) {
+    var groups = { other: [['manual-list', '手動出品'], ['auto-list', '自動出品設定']], sales: [['orders', '注文'], ['profit-report', '収益']], marketing: [['watchers', 'ウォッチャー分析'], ['offers', 'オファー']] };
+    return '<nav class="page-tabs" aria-label="ページ切替">' + groups[group].map(function (tab) {
+      return '<a href="#/' + tab[0] + '"' + (tab[0] === current ? ' aria-current="page"' : '') + '>' + tab[1] + '</a>';
+    }).join('') + '</nav>';
+  };
+  D.listingError = function (listing) { return listing && (listing.status === 'error' || !!listing.error); };
+  D.productMatches = function (item, filter) {
+    var listing = D.state.listings.find(function (l) { return l.own && l.productId === item.id; });
+    var listed = !!listing;
+    var error = D.listingError(listing) || item.error || item.aiError || (item.processed && window.DemoCalc.validateListing(item).length > 0);
+    if (filter === 'errors') return !!error;
+    if (filter === 'ai-pending') return !item.processed && !error;
+    if (filter === 'price-pending') return item.processed && !error && !listed && !item.priceSet && !D.state.profitInputs[item.id];
+    if (filter === 'ready') return item.processed && !error && !listed;
+    return true;
+  };
+  D.filterNotice = function (route) {
+    var labels = { errors: '出品エラー', 'ai-pending': 'AI処理待ち', 'price-pending': '価格設定待ち', ready: '出品待ち', pending: '発送待ちの注文', unavailable: '仕入れ元が売り切れ・削除', markdown: '値下げ候補' };
+    return D.filter ? '<p class="filter-notice">絞り込み: ' + D.esc(labels[D.filter] || D.filter) + ' <a href="#/' + route + '">すべて表示</a></p>' : '';
+  };
   var navOpen = {};
   function navLink(route, label) {
     var unread = D.state.messages.filter(function (m) { return !m.read; }).length;
-    return '<a class="nav-link' + (D.route === route ? ' active' : '') + '" ' + (D.route === route ? 'aria-current="page" ' : '') + 'href="#/' + route + '">' + label + (route === 'messages' && unread ? '<span class="badge">' + unread + '</span>' : '') + '</a>';
+    return '<a class="nav-link' + (parentRoute(D.route) === route ? ' active' : '') + '" ' + (parentRoute(D.route) === route ? 'aria-current="page" ' : '') + 'href="#/' + route + '">' + label + (route === 'messages' && unread ? '<span class="badge">' + unread + '</span>' : '') + '</a>';
   }
   D.navigation = function () {
-    document.getElementById('navigation').innerHTML = navLink('welcome', 'はじめに') + navLink('dashboard', 'ダッシュボード') + menu.map(function (group, i) {
-      var current = group[1].some(function (m) { return m[0] === D.route || (m[0] === 'products' && D.route === 'ai-process'); });
+    document.getElementById('navigation').innerHTML = navLink('dashboard', 'ダッシュボード') + menu.map(function (group, i) {
+      var current = group[1].some(function (m) { return m[0] === parentRoute(D.route); });
       return '<details data-nav-group="' + i + '"' + (current || navOpen[i] !== false ? ' open' : '') + '><summary>' + group[0] + '</summary>' + group[1].map(function (m) { return navLink(m[0], m[1]); }).join('') + '</details>';
-    }).join('') + navLink('summary', '体験のまとめ');
+    }).join('');
     document.querySelectorAll('[data-nav-group]').forEach(function (el) { el.addEventListener('toggle', function () { navOpen[el.dataset.navGroup] = el.open; }); });
   };
   D.render = function () {
     var route = location.hash.replace(/^#\//, '') || 'welcome';
+    var query = route.split('?');
+    route = query[0]; D.filter = ((query[1] || '').match(/(?:^|&)filter=([a-z-]+)/) || [])[1] || '';
     var parts = route.split('/');
     if (parts[0] === 'ai-process' && D.product(parts[1])) { D.state.selected = parts[1]; route = 'ai-process'; }
     if (!screens[route]) route = 'welcome';
@@ -108,7 +131,7 @@
     if (route === 'profit') D.event('profitSeen');
     if (route === 'dashboard' && D.state.events.listed) D.event('dashboardSeen');
     if (route === 'watchers') D.event('watchersSeen');
-    if (route === 'profit-report') D.event('reportSeen');
+    if (route === 'profit-report' || route === 'shipping') D.event('reportSeen');
     if (route === 'shipping') D.event('shippingSeen');
     D.navigation();
     document.getElementById('main').innerHTML = activeScreen.render();
@@ -167,8 +190,6 @@
       if (event.target.closest('.skip-link')) { event.preventDefault(); document.getElementById('main').focus({ preventScroll: true }); return; }
       var market = event.target.closest('[data-market]');
       if (market) { D.state.marketOpened = true; D.state.started = true; D.refreshGuide(); }
-      var other = event.target.closest('[data-other-products]');
-      if (other) { D.state.selected = 'holo-card'; D.state.urlInvalid = true; D.state.aiOpen = false; D.save(); if (D.route === 'products') D.render(); if (document.querySelector('.modal')) D.closeModal(); }
       if (event.target.closest('[data-modal-close]')) D.closeModal();
       if (event.target.closest('[data-modal-confirm]')) {
         var checks = Array.from(document.querySelectorAll('[data-confirm-check]'));

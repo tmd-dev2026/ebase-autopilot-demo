@@ -29,9 +29,8 @@
     if (!await stage(hooks, job, 'AI 処理', aiSteps)) { job.status = 'cancelled'; return item; }
     item.processed = true; item.title = p.ai.titleEn; item.description = p.ai.descriptionEn.join('\n');
     item.category = p.ai.category; item.condition = p.ai.conditionEn; item.specifics = p.ai.specifics.map(function (row) { return row.slice(); });
-    item.ready = false; item.lossAcknowledged = false;
+    item.ready = false;
     job.completed.push('AI 処理');
-    if (!C.checkListable(p).ok) { job.status = 'blocked'; item.blocked = true; job.message = 'この商品は出せません'; return item; }
     if (automatic) {
       if (!await stage(hooks, job, '価格設定', ['送料を比較', '手残りを計算', '価格設定を適用'])) { job.status = 'cancelled'; return item; }
       var values = Object.assign({ sale: p.sale, cost: p.cost, weight: p.weightKg, rate: 155, buyerShipping: 0 }, state.profitInputs[id]);
@@ -39,8 +38,7 @@
       quotes.sort(function (a, b) { return b.net - a.net; });
       values.carrier = quotes[0].carrier; state.profitInputs[id] = values;
       item.net = quotes[0].net; item.priceSet = true; job.completed.push('価格設定');
-      if (item.net < 0) { item.lossWarning = true; job.status = 'loss'; job.message = '赤字です。送料と売値を確認してください'; return item; }
-      item.lossWarning = false; item.ready = true;
+      item.ready = true;
     }
     job.status = 'done'; return item;
   }
@@ -61,12 +59,7 @@
     for (var entry of parsed.valid) await acquire(state, entry.id, mode === 'auto' ? 'auto' : 'batch', hooks);
     return parsed;
   }
-  function acknowledgeLoss(state, id) {
-    var item = state.products.find(function (it) { return it.id === id; });
-    if (!item || !item.lossWarning || !C.checkListable(product(id)).ok) return false;
-    item.lossAcknowledged = true; item.ready = true; return true;
-  }
-  var api = { acquire: acquire, process: process, batch: batch, parseBatch: parseBatch, acknowledgeLoss: acknowledgeLoss, aiSteps: aiSteps };
+  var api = { acquire: acquire, process: process, batch: batch, parseBatch: parseBatch, aiSteps: aiSteps };
   if (root) root.DemoWorkflow = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 }(typeof window !== 'undefined' ? window : null));

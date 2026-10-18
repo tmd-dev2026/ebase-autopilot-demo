@@ -20,7 +20,7 @@
         [s.messages.some(function (m) { return m.sent; }), '買い手への返信案を作成して送信'], [s.offers.length, '割引オファーの手残りを計算'],
         [e.templateCreated, '自動出品のスケジュールを設定'], [e.reportSeen && e.shippingSeen, '収益と送料の差額を集計']
       ];
-      return D.heading('体験のまとめ', '自動になる作業と、あなたが判断すること。', 'YOUR EXPERIENCE') + D.note('繰り返しの作業を自動で進め、状況をまとめてお知らせします。出品内容や真贋、利益の最終確認は出品者が行います。') + '<section class="card"><h2>今回体験したこと</h2><ul class="check-list">' + items.map(function (item) { return '<li><span class="' + (item[0] ? 'scheduled' : 'muted') + '">' + (item[0] ? '✓ 体験済み' : '○ 未体験') + '</span>　' + item[1] + '</li>'; }).join('') + '</ul></section><section class="card"><h2>本物との違い</h2><p>この体験版は、商品取得・AI処理・出品・取引を固定のダミーデータで再現しています。<br>本物では外部サービスとの接続と設定が必要になり、結果は商品や条件によって変わります。<br>体験版の価格・手数料・送料・為替・手残りはすべて例で、実際の結果を保証しません。</p></section><!-- CTA_PLACEHOLDER -->';
+      return D.heading('体験のまとめ', '自動になる作業と、あなたが判断すること。', 'YOUR EXPERIENCE') + D.note('繰り返しの作業を自動で進め、状況をまとめてお知らせします。出品内容や商品状態、利益は出品者が確認します。') + '<section class="card"><h2>今回体験したこと</h2><ul class="check-list">' + items.map(function (item) { return '<li><span class="' + (item[0] ? 'scheduled' : 'muted') + '">' + (item[0] ? '✓ 体験済み' : '○ 未体験') + '</span>　' + item[1] + '</li>'; }).join('') + '</ul></section><section class="card"><h2>本物との違い</h2><p>この体験版は、商品取得・AI処理・出品・取引を固定のダミーデータで再現しています。<br>本物では外部サービスとの接続と設定が必要になり、結果は商品や条件によって変わります。<br>体験版の価格・手数料・送料・為替・手残りはすべて例で、実際の結果を保証しません。</p></section><!-- CTA_PLACEHOLDER -->';
     }
   });
 }());

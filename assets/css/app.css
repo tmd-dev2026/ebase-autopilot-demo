@@ -72,3 +72,12 @@
   .formula div{flex-direction:column;gap:4px}
   .formula dt,.formula dd{width:100%;min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere}
 }
+
+/* Shared parent-page navigation and embedded shipping costs. */
+.page-tabs{display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border);margin-bottom:20px}
+.page-tabs a{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;text-decoration:none;color:var(--muted-foreground);border-bottom:3px solid transparent}
+.page-tabs a[aria-current="page"]{color:var(--link);border-bottom-color:var(--primary);font-weight:700}
+#shipping-section>summary{cursor:pointer;min-height:44px;padding:12px 0;font-weight:700}
+#shipping-section[open]>summary{margin-bottom:16px}
+.profit-gauge{width:100%;height:20px}
+.filter-notice{padding:12px 0}.filter-notice a{display:inline-flex;align-items:center;min-height:44px;margin-left:12px}

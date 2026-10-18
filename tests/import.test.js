@@ -14,12 +14,13 @@ function url(p) { return 'https://any.example/demo/items/' + p.slug + '.html'; }
     s = state(); events = [];
     await W.acquire(s, p.id, 'auto', { navigate: function () { assert.fail('auto mode must not navigate'); }, step: function (job) { events.push(job.stage); } });
     var item = s.products[0];
-    if (!p.listable) { assert.deepStrictEqual(events, ['取得', 'AI 処理']); assert.strictEqual(s.jobs[0].status, 'blocked'); assert.strictEqual(item.ready, false); assert.strictEqual(W.acknowledgeLoss(s, p.id), false); }
-    else {
-      assert.deepStrictEqual(events, ['取得', 'AI 処理', '価格設定']); assert.strictEqual(s.profitInputs[p.id].carrier, 'SpeedPAK');
-      if (p.id === 'figure-large') { assert.strictEqual(s.jobs[0].status, 'loss'); assert(s.jobs[0].message.includes('赤字')); assert.strictEqual(item.ready, false); assert(W.acknowledgeLoss(s, p.id)); assert(item.ready && item.lossAcknowledged); }
-      else assert.strictEqual(item.ready, true);
-    }
+    assert.deepStrictEqual(events, ['取得', 'AI 処理', '価格設定']);
+    assert.strictEqual(s.profitInputs[p.id].carrier, 'SpeedPAK');
+    assert.strictEqual(s.jobs[0].status, 'done');
+    assert.strictEqual(item.ready, true);
+    assert.deepStrictEqual(s.jobs[0].completed, ['取得', 'AI 処理', '価格設定']);
+    if (p.id === 'figure-large') assert(item.net < 0);
+
   }
   s = state();
   await W.batch(s, products.map(url).join('\n'), 'normal', {});
@@ -33,5 +34,5 @@ function url(p) { return 'https://any.example/demo/items/' + p.slug + '.html'; }
   assert.strictEqual(s.products.length, 4); assert(!s.products.some(function (it) { return it.id === 'fd-lens' || it.id === 'figure-large'; }));
   s = state(); await W.acquire(s, 'holo-card', 'normal', { step: function () { return false; } }); assert.strictEqual(s.products.length, 0);
   s = state(); await W.acquire(s, 'holo-card', 'normal', { step: function (job) { return job.stage !== 'AI 処理'; } }); assert.strictEqual(s.products[0].processed, false); assert.strictEqual(s.jobs[0].status, 'cancelled');
-  console.log('Import workflows passed: automatic normal route + AI, three-stage auto, bag/loss stops, six-row batch, line errors, limits and cancellation.');
+  console.log('Import workflows passed: automatic normal route + AI, three-stage auto, all six products finish including losses, six-row batch, line errors, limits and cancellation.');
 }()).catch(function (error) { console.error(error); process.exitCode = 1; });

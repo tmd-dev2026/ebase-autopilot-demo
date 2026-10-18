@@ -5,7 +5,11 @@
     var rates = C.shippingRates(values.weight);
     var selected = rates.find(function (q) { return q.carrier === values.carrier; }) || rates[0];
     var net = rates.map(function (r) { return C.calcProfit(Object.assign({}, values, { shipping: r.price })).net; });
-    return '<div class="grid two"><article class="card"><h2>手残りの内訳（例）</h2>' + D.formula(Object.assign({}, values, { shipping: selected.price })) + '<p class="field-note">手残りは売上から手数料・送料・仕入れを引いた額です。プラスでも、追加の費用がないか確認しましょう。</p></article><article class="card"><h2>国際送料を比較</h2><p class="muted">料金は例です。実際の料金表ではありません。</p><div class="stack">' + rates.map(function (r, i) { return '<div><div class="row between"><strong>' + r.carrier + '（例）</strong>' + (net[i] === Math.max.apply(null, net) ? '<span class="badge success">手残りが最大</span>' : '') + '</div><p>送料 ' + D.yen(r.price) + ' / <span class="' + (net[i] < 0 ? 'negative' : 'positive') + '">' + (net[i] < 0 ? '赤字 ' : '黒字 ') + D.yen(net[i]) + '</span></p></div>'; }).join('') + '</div><small>重さ kg から算出: SpeedPAK = round(2900 + 2100 × kg)、EMS = round(3300 + 2800 × kg)、DHL = round(4200 + 3100 × kg)</small></article></div>';
+    var r = C.calcProfit(Object.assign({}, values, { shipping: selected.price }));
+    var usdYen = function (yen) { return D.yen(yen) + ' / ' + (values.rate > 0 ? D.usd(yen / values.rate) : '— USD'); };
+    var margin = r.revenueYen ? r.net / r.revenueYen * 100 : 0;
+    return '<div class="grid two"><article class="card"><h2>収入 / 控除 / ' + (r.net < 0 ? '⚠ 純損失' : '純利益') + '（例）</h2><h3>収入</h3><dl class="formula"><div><dt>売値 ' + D.usd(values.sale) + ' + 買い手送料 ' + D.usd(values.buyerShipping) + '<br>× 為替 ' + values.rate + ' 円/USD（例）</dt><dd>' + usdYen(r.revenueYen) + '</dd></div></dl><h3>控除</h3><dl class="formula"><div><dt>− eBay手数料<br><small>粗額 × (13.25% + 1.35%) + $0.40</small></dt><dd>' + D.yen(r.feeYen) + ' / ' + D.usd(r.feeUsd) + '</dd></div><div><dt>− 国際送料</dt><dd>' + usdYen(r.shipping) + '</dd></div><div><dt>− 仕入れ</dt><dd>' + usdYen(r.cost) + '</dd></div><div class="total"><dt>' + (r.net < 0 ? '⚠ 純損失' : '純利益') + '</dt><dd class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + usdYen(r.net) + (r.net < 0 ? ' <span class="badge negative">⚠ 赤字</span>' : ' 黒字') + '</dd></div></dl><p>利益率（例） ' + (r.revenueYen ? margin.toFixed(1) + '%' : '—') + '</p><meter class="profit-gauge" min="-100" max="100" value="' + Math.max(-100, Math.min(100, margin)) + '" aria-label="見込み利益率（例）">' + margin.toFixed(1) + '%</meter><p class="field-note">円表示は四捨五入。純利益は丸め前の手数料から計算します。表示はすべて例であり、手残りは保証されません。</p></article><article class="card"><h2>国際送料を比較</h2><p class="muted">料金は例です。実際の料金表ではありません。</p><div class="table-wrap"><table><thead><tr><th>配送方法</th><th>送料(円)</th><th>送料(USD)</th><th>備考</th><th>手残り</th></tr></thead><tbody>' + rates.map(function (q, i) { return '<tr><th scope="row">' + q.carrier + '</th><td>' + D.yen(q.price) + '</td><td>' + (values.rate > 0 ? D.usd(q.price / values.rate) : '—') + '</td><td>重さからの見積もり（例）' + (net[i] === Math.max.apply(null, net) ? '<span class="badge">手残りが最大</span>' : '') + '</td><td class="' + (net[i] < 0 ? 'negative' : 'positive') + '">' + (net[i] < 0 ? '⚠ 赤字 ' : '黒字 ') + D.yen(net[i]) + '</td></tr>'; }).join('') + '</tbody></table></div><small>重さ kg から算出: SpeedPAK = round(2900 + 2100 × kg)、EMS = round(3300 + 2800 × kg)、DHL = round(4200 + 3100 × kg)</small></article></div>';
+
   }
   D.register('profit', {
     render: function () {
@@ -24,7 +28,7 @@
       if (item && item.priceSet) {
         var quote = C.shippingRates(values.weight).find(function (q) { return q.carrier === values.carrier; });
         item.net = C.calcProfit(Object.assign({}, values, { shipping: quote.price })).net;
-        item.lossWarning = item.net < 0; item.lossAcknowledged = false; item.ready = !item.lossWarning && !item.blocked;
+        item.ready = true;
       }
       D.save();
       document.getElementById('profit-error').textContent = ''; document.getElementById('profit-results').innerHTML = results(values);

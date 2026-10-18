@@ -5,11 +5,11 @@
     ['welcome', 'はじめに。ガイド付きで体験を始めましょう。', '[data-action="start-guide"]'],
     ['products', '別タブでフリマを開き、商品ページの URL をコピーしてください。', '[data-guide-market]'],
     ['products', 'URL を貼って取得してください。自動で AI 処理が始まります。', '#import-url'],
-    ['ai-process', '結果と出品前チェックを確認してください。出品不可の場合は別の商品で試せます。', '[data-action="review-result"]'],
+    ['ai-process', '結果と出品前チェックの要修正・注意を確認してください。', '[data-action="review-result"]'],
     ['profit', '送料を比較し、手残りの式を確認しましょう。', '#profit-form'],
-    ['listings', 'チェックリストを確認して出品してください。', '[data-action="publish"]'],
+    ['listings', '「出品する」を押して出品してください。', '[data-action="publish"]'],
     ['dashboard', '優先して対応する作業を確認しましょう。', '#priorities'],
-    ['monitor', '初期デモ出品の売り切れを再現してください。', '[data-action="sold-out"]'],
+    ['dashboard', 'ダッシュボードから在庫監視を開き、初期デモ出品の売り切れを再現してください。', '[data-guide-monitor]'],
     ['orders', '別の出品で購入を再現し、発送登録してください。', '[data-action="buy"], [data-shipping-form]'],
     ['messages', 'AI 返信案を作り、確認して送信しましょう。', '[data-action="reply-ai"], [data-reply-form]'],
     ['watchers', 'ウォッチャー・オファー・自動出品設定を体験しましょう。', '[data-guide-offers], #auto-form, [data-action="send"]'],
@@ -28,6 +28,7 @@
       var host = document.getElementById('guide');
       if (!D.state.guide) { host.innerHTML = '<div class="row between"><small>自由に体験中 · すべてのメニューを利用できます</small><button data-guide="resume">ガイドを再開</button></div>'; return; }
       var n = index(), step = steps[Math.min(n, 11)], route = step[0];
+      if (n === 7 && D.route === 'monitor') { route = 'monitor'; step = ['monitor', step[1], '[data-action="sold-out"]']; }
       if (n === 3) route += '/' + D.state.selected;
       if (n === 10 && D.state.events.watchersSeen) route = D.state.offers.length ? 'auto-list' : 'offers';
       if (n === 11 && D.state.events.reportSeen) route = 'shipping';

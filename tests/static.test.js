@@ -12,6 +12,15 @@ files.forEach(function (file) {
   if (!file.endsWith('.svg') && !file.endsWith('config.js')) assert(!/https?:\/\/[A-Za-z0-9]/.test(source), 'Unexpected external URL: ' + file);
   if (file.endsWith('.svg')) assert(!/ebay/i.test(path.basename(file)));
 });
+var removedCopy = ['出品' + '不可', '出せ' + 'ません', '真' + '贋', '製品' + '安全', 'ack' + '-loss', '最終' + '確認'];
+files.filter(function (file) { return /\.(?:html|js)$/.test(file); }).concat([path.join(root, 'README.md')]).forEach(function (file) {
+  var source = fs.readFileSync(file, 'utf8');
+  removedCopy.forEach(function (word) { assert(!source.includes(word), file + ': obsolete copy ' + word); });
+});
+var productsScreen = fs.readFileSync(path.join(root, 'assets/js/screens/products.js'), 'utf8');
+assert(!/data-action="detail"/.test(productsScreen));
+assert(!/>詳細<\/button>/.test(productsScreen));
+assert(!/checkListable|lossAcknowledged|acknowledgeLoss/.test(files.filter(function (file) { return file.endsWith('.js'); }).map(function (file) { return fs.readFileSync(file, 'utf8'); }).join('\n')));
 var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 assert(html.includes('name="robots" content="noindex,nofollow"'));
 assert(html.includes('name="viewport"'));

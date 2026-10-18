@@ -24,7 +24,7 @@
       var p = D.product(id);
       return { id: 'past-' + i, productId: id, label: '過去の例 / ' + p.name, sale: p.sale, rate: 155, cost: p.cost, shipping: C.shippingRates(p.weightKg)[0].price, domestic: 0, ads: 0 };
     });
-    return { version: 2, guide: true, started: false, marketOpened: false, selected: 'holo-card', products: [], importCount: 0, inputMode: 'single', importMode: 'normal', dateFilter: 'today', selection: [], jobs: [], batchErrors: [],
+    return { version: 3, guide: true, started: false, marketOpened: false, selected: 'holo-card', products: [], importCount: 0, inputMode: 'single', importMode: 'normal', dateFilter: 'today', selection: [], jobs: [], batchErrors: [],
       samples: ['wrist-watch', 'fd-lens'].map(function (id) { var p = D.product(id); return { id: id, example: true, processed: true, title: p.ai.titleEn, description: p.ai.descriptionEn.join('\n'), template: '自動判定', instruction: '' }; }),
       listings: listings, orders: orders,
       messages: orders.slice(0, 3).map(function (o, i) {

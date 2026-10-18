@@ -45,16 +45,14 @@
     }
     return null;
   }
-  function checkListable(product) {
-    var blocked = !product || product.listable === false || product.id === 'shoulder-bag' || product.productId === 'shoulder-bag' ||
-      (product.brandLogo === true && product.authenticityProof !== true);
-    return blocked ? { ok: false, reasons: [
-      '偽造品や無許可のコピー品の出品は禁止です。出品者が本物と確認できる必要があります。',
-      'この商品には保証書や購入証明がなく、真贋を証明できないため出せません。',
-      'ブランド名だけ借りた出品は禁止です。'
-    ] } : { ok: true, reasons: [] };
+  function validateListing(item) {
+    var errors = [];
+    if (String(item.title || '').length > 80) errors.push('英語タイトルが 80 字超です。');
+    if (['title', 'description', 'category', 'condition'].some(function (key) { return !String(item[key] || '').trim(); }) ||
+        !item.specifics || !item.specifics.length || item.specifics.some(function (row) { return !String(row[1] || '').trim(); })) errors.push('必須項目が空です。');
+    return errors;
   }
-  var api = { calcProfit: calcProfit, shippingRates: shippingRates, matchDemoUrl: matchDemoUrl, checkListable: checkListable };
+  var api = { calcProfit: calcProfit, shippingRates: shippingRates, matchDemoUrl: matchDemoUrl, validateListing: validateListing };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DemoCalc = api;
 }(typeof window !== 'undefined' ? window : null));
