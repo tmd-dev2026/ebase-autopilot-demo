@@ -9,6 +9,13 @@
       D.state = Object.assign(D.initialState(), saved);
     }
   } catch (error) { /* The in-memory state remains fully usable. */ }
+  // Keep saved sessions, removing only repeated initial listing examples.
+  var seedProducts = [];
+  D.state.listings = D.state.listings.filter(function (l) {
+    if (l.own) return true;
+    if (seedProducts.includes(l.productId) || seedProducts.length >= 5) return false;
+    seedProducts.push(l.productId); l.recommended = seedProducts.length === 1; return true;
+  });
   D.state.jobs.forEach(function (job) { if (job.status === 'running') { job.status = 'cancelled'; job.detail = ''; } });
   D.save = function () { try { localStorage.setItem(storageKey, JSON.stringify(D.state)); } catch (error) { /* Memory fallback. */ } };
   D.esc = function (value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
@@ -37,11 +44,20 @@
   };
   D.formula = function (input) {
     var r = window.DemoCalc.calcProfit(input);
-    return '<dl class="formula"><div><dt>売値 ' + D.usd(input.sale) + ' + 買い手送料 ' + D.usd(input.buyerShipping || 0) + '<br>× 為替 ' + input.rate + ' 円/USD（例）</dt><dd>' + D.yen(r.revenueYen) + '</dd></div><div><dt>− 手数料<br><small>粗額 × (13.25% + 1.35%) + $0.40</small></dt><dd>' + D.yen(r.feeYen) + '</dd></div><div><dt>− 国際送料</dt><dd>' + D.yen(r.shipping) + '</dd></div><div><dt>− 仕入れ</dt><dd>' + D.yen(r.cost) + '</dd></div>' + (r.domestic || r.ads ? '<div><dt>− 国内送料 / 広告費</dt><dd>' + D.yen(r.domestic) + ' / ' + D.yen(r.ads) + '</dd></div>' : '') + '<div class="total"><dt>手残り（例）</dt><dd class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + (r.net < 0 ? '赤字 ' : '黒字 ') + D.yen(r.net) + '</dd></div></dl><small>円表示は四捨五入。手残りは丸め前の手数料から計算します。</small>';
+    return '<dl class="formula"><div><dt>売値 ' + D.usd(input.sale) + ' + 買い手送料 ' + D.usd(input.buyerShipping || 0) + '<br>× 為替 ' + input.rate + ' 円/USD（例）</dt><dd>' + D.yen(r.revenueYen) + '</dd></div><div><dt>− 手数料</dt><dd>' + D.yen(r.feeYen) + '</dd></div><div><dt>− 国際送料</dt><dd>' + D.yen(r.shipping) + '</dd></div><div><dt>− 仕入れ</dt><dd>' + D.yen(r.cost) + '</dd></div>' + (r.domestic || r.ads ? '<div><dt>− 国内送料 / 広告費</dt><dd>' + D.yen(r.domestic) + ' / ' + D.yen(r.ads) + '</dd></div>' : '') + '<div class="total"><dt>手残り（例）</dt><dd class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + (r.net < 0 ? '赤字 ' : '黒字 ') + D.yen(r.net) + '</dd></div></dl><small>円表示は四捨五入。手残りは丸め前の手数料から計算します。</small>' + D.calculationDetails();
   };
-  D.toast = function (text) {
+  D.calculationDetails = function () {
+    return '<details class="calculation-details"><summary>計算の式を見る</summary><p>手数料 = 粗額 × (13.25% + 1.35%) + $0.40。粗額 = 売値 + 買い手送料。手残り = (粗額 − 手数料) × 為替 − 国際送料 − 仕入れ − 国内送料 − 広告費。見込み利益率 = 手残り ÷ 収入 × 100。</p><p>送料（例）: SpeedPAK = round(2900 + 2100 × kg)、EMS = round(3300 + 2800 × kg)、DHL = round(4200 + 3100 × kg)</p></details>';
+  };
+  D.reveal = function (target) {
+    if (!target) return;
+    if (!target.matches('a[href],button,input,select,textarea,summary,[tabindex]')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'start', behavior: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  };
+  D.toast = function (text, error) {
     clearTimeout(toastTimer); document.getElementById('toast').textContent = text;
-    toastTimer = setTimeout(function () { document.getElementById('toast').textContent = ''; }, 4500);
+    toastTimer = setTimeout(function () { document.getElementById('toast').textContent = ''; }, error ? 5000 : 3000);
   };
   D.closeModal = function () {
     document.getElementById('modal-root').innerHTML = ''; document.body.classList.remove('modal-open');
@@ -128,7 +144,7 @@
     if (parts[0] === 'ai-process' && D.product(parts[1])) { D.state.selected = parts[1]; route = 'ai-process'; }
     if (!screens[route]) route = 'welcome';
     D.route = route; activeScreen = screens[route];
-    if (route === 'profit') D.event('profitSeen');
+    if (route === 'profit') D.event('priceSeen');
     if (route === 'dashboard' && D.state.events.listed) D.event('dashboardSeen');
     if (route === 'watchers') D.event('watchersSeen');
     if (route === 'profit-report' || route === 'shipping') D.event('reportSeen');
@@ -166,6 +182,20 @@
       document.documentElement.dataset.theme = window.DemoTheme.toggle(current, storage); themeButton();
     });
     if (systemTheme && systemTheme.addEventListener) systemTheme.addEventListener('change', themeButton);
+    function measureShell() {
+      [['.app-header', '--header-height'], ['.disclaimer', '--footer-height'], ['#guide-shell', '--guide-height']].forEach(function (entry) {
+        document.documentElement.style.setProperty(entry[1], Math.ceil(document.querySelector(entry[0]).getBoundingClientRect().height) + 'px');
+      });
+    }
+    measureShell();
+    if (window.ResizeObserver) {
+      var observer = new window.ResizeObserver(measureShell);
+      ['.app-header', '.disclaimer', '#guide-shell'].forEach(function (selector) { observer.observe(document.querySelector(selector)); });
+    }
+    window.addEventListener('resize', measureShell);
+    document.getElementById('toast').addEventListener('click', function () { clearTimeout(toastTimer); this.textContent = ''; });
+    document.getElementById('toast').addEventListener('keydown', function (event) { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); } });
+    document.getElementById('navigation').addEventListener('click', function (event) { if (event.target.closest('a[href]')) closeDrawer(); });
     function renderRoute() {
       D.render();
       document.getElementById('main').focus({ preventScroll: true });
@@ -199,12 +229,12 @@
     });
     document.getElementById('main').addEventListener('click', function (event) {
       var button = event.target.closest('[data-action]');
-      if (button && activeScreen.click && !D.busy && !D.working) Promise.resolve(activeScreen.click(button.dataset.action, button, event)).catch(function () { D.toast('操作を完了できませんでした。入力を確認してください。'); });
+      if (button && activeScreen.click && !D.busy && !D.working) Promise.resolve(activeScreen.click(button.dataset.action, button, event)).catch(function () { D.toast('操作を完了できませんでした。入力を確認してください。', true); });
     });
     ['input', 'change', 'submit'].forEach(function (type) {
       document.getElementById('main').addEventListener(type, function (event) {
         if (type === 'submit') event.preventDefault();
-        if (activeScreen[type] && !D.busy && !D.working) Promise.resolve(activeScreen[type](event)).catch(function () { D.toast('入力を確認してください。0 以上の数字が必要です。'); });
+        if (activeScreen[type] && !D.busy && !D.working) Promise.resolve(activeScreen[type](event)).catch(function () { D.toast('入力を確認してください。0 以上の数字が必要です。', true); });
       });
     });
     document.addEventListener('keydown', function (event) {

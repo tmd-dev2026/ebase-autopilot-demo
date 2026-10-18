@@ -27,5 +27,5 @@ assert.deepStrictEqual(calls, ['render', 'focus', 'scroll']);
 assert(/renderRoute\(\);\s*window.addEventListener\('hashchange',[^\n]*renderRoute\(\)/.test(core), 'Initial load and hash changes use the same focus handling');
 assert(!/getElementById\('main'\)\.focus\(\)/.test(core), 'All main focus calls prevent scrolling');
 assert(/body\{[^}]*overflow-anchor:none/.test(css), 'Guide height changes must not trigger viewport scroll anchoring');
-assert(!/\.focus\(|scrollIntoView\(|scrollTo\(/.test(guide), 'Guide updates must not move focus or scroll');
+assert(guide.includes('D.reveal('), 'Guide navigation reveals its actual target');
 console.log('Navigation focus, scroll reset and guide scroll regression checks passed.');

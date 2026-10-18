@@ -10,11 +10,11 @@
   };
   D.product = function (id) { return D.data.products.find(function (p) { return p.id === id; }); };
   D.initialState = function () {
-    var ids = ['holo-card', 'film-camera', 'wrist-watch', 'fd-lens', 'figure-large', 'holo-card', 'film-camera', 'wrist-watch', 'fd-lens'];
-    var watchers = [18, 24, 15, 20, 10, 17, 12, 16, 12];
+    var ids = ['holo-card', 'film-camera', 'wrist-watch', 'fd-lens', 'figure-large'];
+    var watchers = [18, 24, 15, 20, 10];
     var listings = ids.map(function (id, i) {
       var p = D.product(id);
-      return { id: 'seed-' + (i + 1), productId: id, own: false, status: 'live', source: 'available', sale: p.sale, cost: p.cost, weight: p.weightKg, rate: 155, carrier: 'SpeedPAK', watchers: watchers[i], views: 96 + i * 21, sold: false };
+      return { id: 'seed-' + (i + 1), productId: id, own: false, recommended: i === 0, status: 'live', source: 'available', sale: p.sale, cost: p.cost, weight: p.weightKg, rate: 155, carrier: 'SpeedPAK', watchers: watchers[i], views: 96 + i * 21, sold: false };
     });
     var orders = ids.slice(0, 5).map(function (id, i) {
       var p = D.product(id);
@@ -32,7 +32,7 @@
       }),
       templates: [{ id: 'template-example-1', category: 'トレカ', frequency: '毎日', time: '09:00', count: 3, paused: false }, { id: 'template-example-2', category: 'カメラ', frequency: '毎週', time: '18:00', count: 2, paused: true }],
       offers: [], report: report,
-      shipping: Array.from({ length: 8 }, function (_, i) { var carrier = D.data.carriers[i % 3], p = D.product(ids[i]), estimate = C.shippingRates(p.weightKg)[i % 3].price; return { tracking: 'DEMO-PAST-' + i, productId: p.id, carrier: carrier, estimate: estimate, actual: estimate + (i % 2 ? -180 : 240) }; }),
+      shipping: Array.from({ length: 8 }, function (_, i) { var carrier = D.data.carriers[i % 3], p = D.product(ids[i % ids.length]), estimate = C.shippingRates(p.weightKg)[i % 3].price; return { tracking: 'DEMO-PAST-' + i, productId: p.id, carrier: carrier, estimate: estimate, actual: estimate + (i % 2 ? -180 : 240) }; }),
       profitInputs: {}, events: {}, monitorRule: { keyword: '', min: '', max: '' }, monitorResults: false };
   };
 }());

@@ -19,7 +19,7 @@
     var r = C.calcProfit(Object.assign({}, values, { shipping: best.price }));
     var money = function (yen) { return (values.rate > 0 ? D.usd(yen / values.rate) : '— USD') + ' / ' + D.yen(yen); };
     var rows = [['仕入値(USD)', money(r.cost)], ['送料(USD)', money(r.shipping)], ['eBay手数料', D.usd(r.feeUsd) + ' / ' + D.yen(r.feeYen)], ['出品価格', D.usd(values.sale) + ' / ' + D.yen(values.sale * values.rate)], ['見込み利益', money(r.net)], ['見込み利益率', (r.revenueYen ? (r.net / r.revenueYen * 100).toFixed(1) + '%' : '—') + '（USD・円共通）']];
-    return '<section class="card section"><h2>価格設定（利益）</h2><p>最も手残りが多い配送方法: ' + best.carrier + '（例）</p><dl class="formula">' + rows.map(function (row, i) { return '<div><dt>' + row[0] + '</dt><dd class="' + (i >= 4 ? r.net < 0 ? 'negative' : 'positive' : '') + '">' + row[1] + (i === 4 && r.net < 0 ? ' <span class="badge negative">⚠ 赤字</span>' : '') + '</dd></div>'; }).join('') + '</dl><p class="field-note">為替 ' + values.rate + ' 円/USD（例）。手数料 = (売値 + 買い手送料) × (13.25% + 1.35%) + $0.40。見込み利益率 = 見込み利益 ÷ 収入 × 100。表示はすべて例です。手残りは保証されません。</p><div class="row"><button data-action="to-profit">利益計算で詳しく見る</button><a class="button" href="#/listings">出品管理へ</a></div></section>';
+    return '<details id="price-card" class="card section"' + (D.state.events.priceSeen ? ' open' : '') + '><summary>価格設定（利益）</summary><p>最も手残りが多い配送方法: ' + best.carrier + '（配送方法・例）</p><dl class="formula">' + rows.map(function (row, i) { return '<div><dt>' + row[0] + '</dt><dd class="' + (i >= 4 ? r.net < 0 ? 'negative' : 'positive' : '') + '">' + row[1] + (i === 4 && r.net < 0 ? ' <span class="badge negative">⚠ 赤字</span>' : '') + '</dd></div>'; }).join('') + '</dl><p class="field-note">為替 ' + values.rate + ' 円/USD（例）。表示はすべて例です。手残りは保証されません。</p>' + D.calculationDetails() + '</details><div class="row price-actions"><button class="primary" data-action="to-profit">利益計算で詳しく見る</button><a class="button" href="#/listings">出品管理へ</a></div>';
   }
   function readiness() {
     return D.state.products.filter(function (it) { return it.priceSet && it.ready; }).map(function (item) {
@@ -32,7 +32,7 @@
     return (errors.length ? '<span class="badge warning">要修正(' + errors.length + '件)</span>' + errors.map(function (e) { return '<p>' + D.esc(e) + '</p>'; }).join('') : '') + (warnings.length ? '<span class="badge warning">注意(' + warnings.length + '件)</span>' + warnings.map(function (w) { return '<p>' + D.esc(w.text) + '</p>'; }).join('') : '') + (!errors.length && !warnings.length ? '<small>要修正・注意はありません</small>' : '');
   }
   function result(item, p) {
-    return '<section class="card section"><div class="row between"><h2>AI処理の結果</h2><span class="badge scheduled">AI処理済</span></div><p class="field-note">体験版の英文は固定の例です。テンプレートと指示は保存されます。</p><div class="stack"><label>英語タイトル<input id="ai-title" data-result="title" value="' + D.esc(item.title) + '"><span id="title-count" class="field-note">' + item.title.length + ' / 80 文字</span></label><label>英語の説明文<textarea data-result="description" rows="7">' + D.esc(item.description) + '</textarea></label><label>カテゴリ<input data-result="category" value="' + D.esc(item.category) + '"></label><label>コンディション<input data-result="condition" value="' + D.esc(item.condition) + '"></label></div><h3>商品詳細（Item Specifics）</h3><div class="table-wrap spec-table"><table><tbody>' + item.specifics.map(function (row, i) { return '<tr><th scope="row">' + D.esc(row[0]) + '</th><td><textarea rows="1" data-specific="' + i + '" aria-label="' + D.esc(row[0]) + '">' + D.esc(row[1]) + '</textarea></td></tr>'; }).join('') + '</tbody></table></div><h3 class="section">出品前チェック</h3><div id="title-validation" role="status">' + checks(item, p) + '</div><button data-action="review-result">結果と出品前チェックを確認しました</button></section>' + priceCard(item, p);
+    return '<section class="card section"><div class="row between"><h2>AI処理の結果</h2><span class="badge scheduled">AI処理済</span></div><p class="field-note">体験版の英文は固定の例です。Near Mint（ほぼ新品）。テンプレートと指示は保存されます。</p><div class="stack"><label>英語タイトル<input id="ai-title" data-result="title" value="' + D.esc(item.title) + '"><span id="title-count" class="field-note">' + item.title.length + ' / 80 文字</span></label><label>英語の説明文<textarea data-result="description" rows="7">' + D.esc(item.description) + '</textarea></label><label>カテゴリ<input data-result="category" value="' + D.esc(item.category) + '"></label><label>コンディション<input data-result="condition" value="' + D.esc(item.condition) + '"></label></div><h3 class="specifics-heading">商品詳細（Item Specifics）</h3><p class="field-note">eBay に渡す商品の項目です。</p><div class="table-wrap spec-table"><table><tbody>' + item.specifics.map(function (row, i) { return '<tr><th scope="row">' + D.esc(row[0]) + '</th><td><textarea rows="1" data-specific="' + i + '" aria-label="' + D.esc(row[0]) + '">' + D.esc(row[1]) + '</textarea></td></tr>'; }).join('') + '</tbody></table></div><h3 class="section">出品前チェック</h3><div id="title-validation" role="status">' + checks(item, p) + '</div></section>' + priceCard(item, p);
   }
 
   function row(item, sample) {
@@ -82,7 +82,7 @@
       }
       D.state.selected = id; D.save(); D.go('ai-process/' + id);
     }
-    if (action === 'review-result' || action === 'to-profit') { D.event('resultReviewed'); D.refreshGuide(); if (action === 'to-profit') D.go('profit'); }
+    if (action === 'to-profit') { D.event('priceSeen'); D.go('profit'); }
     if (action === 'profit-product') { D.state.selected = id; D.save(); D.go('profit'); }
     if (action === 'ai-run' && item) {
       if (item.processed && !await D.confirm('AI処理をやり直す', '<p>編集した結果をデモの初期英文に戻します。</p>')) return;
@@ -93,20 +93,23 @@
   D.register('products', {
     render: function () {
       var s = D.state, batch = s.inputMode === 'batch', samples = !D.filter && s.dateFilter === 'yesterday';
-      return D.heading('商品取得', 'URL から、AI が出品の準備を進めます。') + D.note('商品情報を取得すると、そのまま AI 処理が始まります。全自動モードでは送料の比較と価格設定まで進めます。') + '<section class="card"><div class="row between"><h2>商品取得 <span class="badge">今月: ' + s.importCount + ' / 300 件</span></h2><div class="segmented">' + [['single', '単品入力'], ['batch', '一括入力']].map(function (m) { return '<button data-action="input-mode" data-mode="' + m[0] + '" aria-pressed="' + (s.inputMode === m[0]) + '">' + m[1] + '</button>'; }).join('') + '</div></div><form id="import-form"><div class="import-toolbar"><label for="import-mode">モード</label><select id="import-mode"><option value="normal"' + (s.importMode === 'normal' ? ' selected' : '') + '>通常モード</option><option value="auto"' + (s.importMode === 'auto' ? ' selected' : '') + '>全自動モード</option></select></div><label for="import-url">商品 URL を入力（『eBaseマーケット(デモ)』対応）</label><div class="import-row">' + (batch ? '<textarea id="import-url" rows="6" placeholder="1 行に 1 URL、最大 6 行" required aria-describedby="import-help"></textarea>' : '<input id="import-url" type="text" placeholder="商品ページの URL を貼り付け" required autocomplete="off" aria-describedby="import-help">') + '<button class="primary" type="submit"' + (D.working ? ' disabled' : '') + '>取得</button></div><p id="import-help" class="field-note">' + (batch ? '通常: 取得後に一括AI処理。' : '通常: 取得後に AI 処理へ。') + '全自動: 取得・AI 処理・価格設定をまとめて実行。</p></form><div role="status">' + s.batchErrors.map(function (e) { return '<p class="warning-box">' + e.line + ' 行目: ' + D.esc(e.reason) + '</p>'; }).join('') + '</div></section>' + (s.urlInvalid ? choices() : '') + D.filterNotice('products') + jobs() + readiness() + '<div class="row between date-chips"><div class="segmented"><button data-action="date" data-date="today" aria-pressed="' + !samples + '">今日 ' + s.products.length + '</button><button data-action="date" data-date="yesterday" aria-pressed="' + samples + '">昨日 ' + s.samples.length + '（例）</button></div><button data-action="batch-ai"' + (!s.selection.length || D.working ? ' disabled' : '') + '>一括AI処理（' + s.selection.length + ' 件）</button></div>' + (samples ? s.samples.map(function (it) { return row(it, true); }).join('') : s.products.length ? s.products.filter(function (it) { return D.productMatches(it, D.filter); }).map(function (it) { return row(it, false); }).join('') : D.empty('まだ商品を取り込んでいません。商品 URL を入力して取得してください。'));
+      return D.heading('商品取得', 'URL から、AI が出品の準備を進めます。') + '<div class="import-intro">' + D.note('商品情報を取得すると、そのまま AI 処理が始まります。全自動モードでは送料の比較と価格設定まで進めます。') + '<section class="card import-card"><div class="row between"><h2>商品取得 <span class="badge">今月: ' + s.importCount + ' / 300 件</span></h2><div class="segmented">' + [['single', '単品入力'], ['batch', '一括入力']].map(function (m) { return '<button data-action="input-mode" data-mode="' + m[0] + '" aria-pressed="' + (s.inputMode === m[0]) + '">' + m[1] + '</button>'; }).join('') + '</div></div><form id="import-form" novalidate><div class="import-toolbar"><label for="import-mode">モード</label><select id="import-mode"><option value="normal"' + (s.importMode === 'normal' ? ' selected' : '') + '>通常モード</option><option value="auto"' + (s.importMode === 'auto' ? ' selected' : '') + '>全自動モード</option></select></div><label for="import-url">商品 URL を入力（『eBaseマーケット(デモ)』対応）</label><div class="import-row"><div class="import-field">' + (batch ? '<textarea id="import-url" rows="6" placeholder="1 行に 1 URL、最大 6 行" required aria-describedby="import-error import-help">' + D.esc(s.importText || '') + '</textarea>' : '<input id="import-url" type="text" placeholder="商品ページの URL を貼り付け" value="' + D.esc(s.importText || '') + '" required autocomplete="off" aria-describedby="import-error import-help">') + '<p id="import-error" class="input-error" role="status">' + D.esc(s.urlError || '') + '</p></div><button class="primary" type="submit"' + (D.working ? ' disabled' : '') + '>取得</button></div><p id="import-help" class="field-note">' + (batch ? '通常: 取得後に一括AI処理。' : '通常: 取得後に AI 処理へ。') + '全自動モード（取得→AI処理→価格計算をまとめて実行）。</p></form><div role="status">' + s.batchErrors.map(function (e) { return '<p class="warning-box">' + e.line + ' 行目: ' + D.esc(e.reason) + '</p>'; }).join('') + '</div></section></div>' + (s.urlInvalid ? choices() : '') + D.filterNotice('products') + jobs() + readiness() + '<div class="row between date-chips"><div class="segmented"><button data-action="date" data-date="today" aria-pressed="' + !samples + '">今日 ' + s.products.length + '</button><button data-action="date" data-date="yesterday" aria-pressed="' + samples + '">昨日 ' + s.samples.length + '（例）</button></div><button data-action="batch-ai"' + (!s.selection.length || D.working ? ' disabled' : '') + '>一括AI処理（' + s.selection.length + ' 件）</button></div>' + (samples ? s.samples.map(function (it) { return row(it, true); }).join('') : s.products.length ? s.products.filter(function (it) { return D.productMatches(it, D.filter); }).map(function (it) { return row(it, false); }).join('') : D.empty('まだ商品を取り込んでいません。商品 URL を入力して取得してください。'));
     },
     submit: async function (event) {
       if (event.target.id !== 'import-form') return;
       var s = D.state, text = document.getElementById('import-url').value, inline = s.importMode === 'auto' || s.inputMode === 'batch';
+      s.importText = text; s.urlError = ''; s.urlInvalid = false;
       s.jobs = []; s.batchErrors = []; s.dateFilter = 'today';
+      if (!text.trim()) { s.urlError = 'URLを貼り付けてください'; s.urlInvalid = true; D.save(); D.render(); return; }
       if (s.inputMode === 'batch') {
         var parsed = W.parseBatch(text); s.urlInvalid = parsed.errors.length > 0;
+        if (s.urlInvalid) s.urlError = 'このURLは体験版では使えません。下の商品から選んでください';
         await run(function () { return W.batch(s, text, s.importMode, hooks(inline, s)); });
         s.selection = parsed.valid.map(function (v) { return v.id; }).filter(function (id, i, ids) { return ids.indexOf(id) === i; });
         s.urlInvalid = parsed.errors.length > 0; D.save(); D.render(); return;
       }
       var id = C.matchDemoUrl(text);
-      if (!id) { s.urlInvalid = true; D.save(); D.render(); return; }
+      if (!id) { s.urlError = text.trim() ? 'このURLは体験版では使えません。下の商品から選んでください' : 'URLを貼り付けてください'; s.urlInvalid = true; D.save(); D.render(); return; }
       var existing = s.products.find(function (it) { return it.id === id; });
       if (existing) { s.selected = id; D.go('ai-process/' + id); D.toast('取得済みの商品を開きました'); return; }
       await run(function () { return W.acquire(s, id, s.importMode, hooks(inline, s)); });
@@ -123,6 +126,7 @@
       }
       await commonAction(action, button);
     },
+    input: function (event) { if (event.target.id === 'import-url') D.state.importText = event.target.value; },
     change: function (event) {
       if (event.target.id === 'import-mode') D.state.importMode = event.target.value;
       if (event.target.dataset.select) { var id = event.target.dataset.select; D.state.selection = D.state.selection.filter(function (v) { return v !== id; }); if (event.target.checked) D.state.selection.push(id); D.render(); }
@@ -133,6 +137,10 @@
     render: function () {
       var item = imported(), p = D.selected();
       return D.heading('AI処理', p.name) + D.note('画像と商品情報をもとに英語の出品文を作り、出品前チェックまでまとめて実行します。') + (!item ? D.empty('この商品はまだ取得されていません', 'products', '商品取得へ') : '<section class="card"><h2>処理設定 <span class="badge">おすすめ: ' + D.esc(p.template) + '</span></h2><div class="segmented" aria-label="テンプレート">' + ['自動判定', 'デフォルト', 'トレカ', 'カメラ'].map(function (t) { return '<button data-action="template" data-template="' + t + '" aria-pressed="' + (item.template === t) + '">' + t + '</button>'; }).join('') + '</div><label>今回のAI処理への指示（任意）<textarea id="ai-instruction" rows="3">' + D.esc(item.instruction) + '</textarea></label><p class="field-note">個人情報は入力しないでください。英文は固定のデモです。</p><button data-action="ai-run"' + (D.working ? ' disabled' : '') + '>' + (item.processed ? 'AI処理をやり直す' : 'AI処理を実行') + '</button></section>' + (item.processed ? result(item, p) : jobs()));
+    },
+    afterRender: function () {
+      var card = document.getElementById('price-card');
+      if (card) card.addEventListener('toggle', function () { if (card.open) { D.event('priceSeen'); D.refreshGuide(); } });
     },
     click: commonAction,
     input: function (event) {

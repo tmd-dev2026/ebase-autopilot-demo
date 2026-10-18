@@ -8,11 +8,11 @@ var root = path.resolve(__dirname, '..');
 var hashListeners = [];
 var nodes = {}, storage = {}, storageBlocked = false, registered = {}, modal, toast;
 function node(id) {
-  if (!nodes[id]) nodes[id] = { innerHTML: '', textContent: '', value: '', focus: function () {}, addEventListener: function (type, callback) { this[type] = callback; }, classList: { add: function () {}, remove: function () {} } };
+  if (!nodes[id]) nodes[id] = { innerHTML: '', textContent: '', value: '', attributes: {}, matches: function () { return false; }, setAttribute: function (key, value) { this.attributes[key] = value; }, focus: function () { this.focused = true; }, scrollIntoView: function (options) { this.scrolled = options; }, addEventListener: function (type, callback) { this[type] = callback; }, classList: { add: function () {}, remove: function () {} } };
   return nodes[id];
 }
 var context = vm.createContext({
-  window: { addEventListener: function (type, callback) { if (type === 'hashchange') hashListeners.push(callback); } }, URL: URL, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout,
+  window: { requestAnimationFrame: function () {}, addEventListener: function (type, callback) { if (type === 'hashchange') hashListeners.push(callback); } }, URL: URL, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout,
   document: { addEventListener: function () {}, querySelectorAll: function () { return []; }, querySelector: function () { return null; }, getElementById: node },
   location: { hash: '#/welcome', href: 'file:///demo/index.html' },
   localStorage: {
@@ -54,17 +54,23 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
       assert(html.includes('real-note'), route);
       assert(!html.includes('undefined'), route);
     });
-    assert.strictEqual(D.state.listings.length, 9);
+    assert.strictEqual(D.state.listings.length, 5);
     assert.strictEqual(D.state.orders.length, 5);
+    [D.state.listings, D.state.orders].forEach(function (rows) { assert.strictEqual(new Set(rows.map(function (r) { return D.product(r.productId).name; })).size, rows.length); });
     assert.strictEqual(D.state.messages.length, 3);
     assert.strictEqual(D.state.templates.length, 2);
     assert.strictEqual(D.state.shipping.length, 8);
     assert.strictEqual(D.state.report.length, 4);
-    assert.strictEqual(D.live().reduce(function (n, l) { return n + l.watchers; }, 0), 144);
+    assert.strictEqual(D.live().reduce(function (n, l) { return n + l.watchers; }, 0), 87);
     assert.strictEqual(D.state.products.length, 0);
     assert.strictEqual((registered.watchers.render().match(/<tr>/g) || []).length, 7);
     assert.strictEqual(D.guide.index(), 0);
     assert(registered.summary.render().endsWith('<!-- CTA_PLACEHOLDER -->'));
+    var summary = registered.summary.render();
+    assert.strictEqual((summary.match(/○ 未体験/g) || []).length, (summary.match(/<a href=/g) || []).length);
+    assert(summary.includes('href="#/profit-report"'));
+    assert(registered.monitor.render().includes('おすすめ'));
+    assert(registered.listings.render().includes('おすすめ'));
   });
   await test('URL rejection and actual product acquisition', async function () {
     D.state.started = true; D.state.marketOpened = true;
@@ -73,6 +79,12 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     await registered.products.submit({ target: { id: 'import-form' } });
     assert.strictEqual(D.state.products.length, 0);
     assert.strictEqual(D.state.urlInvalid, true);
+    assert(registered.products.render().includes('value="/items/unknown.html"'));
+    assert(registered.products.render().includes('このURLは体験版では使えません。下の商品から選んでください'));
+    node('import-url').value = '';
+    await registered.products.submit({ target: { id: 'import-form' } });
+    assert(registered.products.render().includes('URLを貼り付けてください'));
+    assert(registered.products.render().includes('novalidate'));
     node('import-url').value = 'file:///demo/items/holo-card.html';
     await registered.products.submit({ target: { id: 'import-form' } });
     assert.strictEqual(D.state.products.length, 1);
@@ -80,22 +92,39 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert(D.state.products[0].processed);
     assert.strictEqual(D.guide.index(), 3);
   });
-  await test('AI processing, editable output, and result acknowledgement', async function () {
+  await test('AI processing, editable output, and price disclosure advance', async function () {
     await registered.products.click('ai-open', button('holo-card'));
     registered['ai-process'].input({ target: { id: 'ai-instruction', value: '状態を詳しく説明', dataset: {} } });
     await registered['ai-process'].click('ai-run', button('holo-card'));
     assert(D.state.products[0].processed);
     assert(D.state.products[0].title.length <= 80);
     assert(registered['ai-process'].render().includes('食い違い'));
+    var resultHtml = registered['ai-process'].render();
+    assert(resultHtml.includes('class="primary" data-action="to-profit"'));
+    [resultHtml, registered.profit.render()].forEach(function (html) {
+      var visible = html.replace(/<details class="calculation-details">[\s\S]*?<\/details>/g, '');
+      assert(visible.includes('class="formula"'));
+      assert(!visible.includes('13.25%') && !visible.includes('round('));
+    });
     registered['ai-process'].input({ target: { dataset: { result: 'title' }, value: 'Edited Japanese Holo Card' } });
     assert.strictEqual(D.state.products[0].title, 'Edited Japanese Holo Card');
-    await registered['ai-process'].click('review-result', button('holo-card'));
+    assert(!registered['ai-process'].render().includes('review-result'));
+    node('price-card').open = true; node('price-card').toggle();
     assert.strictEqual(D.guide.index(), 4);
   });
   await test('profit display and actual publish action use configured values', async function () {
     visit('profit');
+    assert.strictEqual(D.guide.index(), 4, 'Opening profit alone does not skip the comparison');
+    registered.profit.click('to-listings');
+    assert.strictEqual(D.guide.index(), 5);
     D.state.profitInputs['holo-card'] = { sale: 160, cost: 14000, weight: 0.36, rate: 155, buyerShipping: 5, carrier: 'EMS' };
     assert(registered.profit.render().includes('手残りが最大'));
+    D.state.events.profitCompared = false;
+    node('profit-form').checkValidity = function () { return true; };
+    node('profit-form').values = { sale: 160, cost: 14000, weight: 0.36, rate: 155, buyerShipping: 5, carrier: 'EMS' };
+    registered.profit.change({ target: { name: 'carrier', closest: function () { return node('profit-form'); } } });
+    assert.strictEqual(D.state.events.profitCompared, true);
+    assert.strictEqual(D.state.profitInputs['holo-card'].carrier, 'EMS');
     visit('listings');
     await registered.listings.click('publish', button('holo-card'));
     var own = D.state.listings.find(function (l) { return l.own; });
@@ -125,9 +154,18 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert.strictEqual(D.state.orders[5].sale, 160);
     assert.strictEqual(D.state.orders[5].buyerShipping, 5);
     assert.strictEqual(D.state.messages[3].read, false);
+    assert(node('order-' + D.state.orders[5].id).scrolled);
+    assert(node('order-' + D.state.orders[5].id).focused);
   });
   await test('shipment registration changes status and creates a shipping record', function () {
     var order = D.state.orders[5];
+    var invalidForm = form({ tracking: '日本語の番号', carrier: 'DHL' }, { dataset: { id: order.id }, querySelector: function () { return node('tracking-input'); } });
+    registered.orders.submit({ target: invalidForm });
+    assert.strictEqual(order.status, 'pending');
+    assert.strictEqual(node('tracking-error-' + order.id).textContent, '英数字とハイフンで4〜40文字');
+    var pattern = registered.orders.render().match(/pattern="([^"]+)"/)[1];
+    var regex = new RegExp('^(?:' + pattern + ')$', 'v');
+    assert(regex.test('DEMO-TRACK-TEST')); assert(!regex.test('日本語の番号'));
     registered.orders.submit({ target: form({ tracking: 'DEMO-TRACK-TEST', carrier: 'DHL' }, { dataset: { id: order.id } }) });
     assert.strictEqual(order.status, 'shipped');
     assert.strictEqual(D.state.shipping.length, 9);
@@ -173,7 +211,10 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     await registered['auto-list'].click('toggle', button(t.id)); assert(!t.paused);
     await registered['auto-list'].click('delete', button(t.id)); assert.strictEqual(D.state.templates.length, 2);
     assert.strictEqual(D.guide.index(), 11);
-    visit('profit-report'); visit('shipping');
+    visit('profit-report');
+    assert.strictEqual(D.guide.index(), 11);
+    node('shipping-section').open = true; node('shipping-section').toggle();
+    visit('shipping');
     assert.strictEqual(D.guide.index(), 12);
     registered.shipping.change({ target: { id: 'shipping-filter', value: 'DHL' } });
     assert(registered.shipping.render().includes('DEMO-TRACK-TEST'));
@@ -332,7 +373,7 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert.doesNotThrow(function () { D.save(); });
     assert.strictEqual(D.state.orders.length, 6);
     load('assets/js/core.js');
-    assert.strictEqual(D.state.listings.length, 9);
+    assert.strictEqual(D.state.listings.length, 5);
     assert.strictEqual(D.state.orders.length, 5);
   });
   console.log('\n' + count + ' workflow checks passed (no browser rendering).');

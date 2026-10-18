@@ -27,7 +27,7 @@
     submit: async function (event) {
       var form = event.target; if (!form.matches('[data-reply-form]')) return;
       var m = find(form.dataset.id), value = new FormData(form).get('reply').trim();
-      if (!value) { D.toast('返信文を入力してください'); return; }
+      if (!value) { D.toast('返信文を入力してください', true); return; }
       if (!await D.loading('返信しています（デモ）', ['返信内容を確認中…', '送信しました（デモ）'], 600)) return;
       m.sent = value; m.sentMeaning = m.meaning; m.draft = ''; m.read = true; D.event('replied'); D.save(); D.render(); D.toast('返信を保存しました（デモ）');
     }

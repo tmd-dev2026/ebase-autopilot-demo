@@ -45,11 +45,11 @@
     <div class="sidebar-bottom"><span class="status-dot"></span>ローカルで動く体験版<br><small>外部サービスへの接続はありません</small></div>
   </aside>
   <div class="app-shell">
-    <section id="guide" aria-label="体験ガイド"></section>
+    <div id="guide-shell"><section id="guide" aria-label="体験ガイド" aria-live="polite"></section>
+      <div id="toast" role="status" aria-live="polite" aria-atomic="true" tabindex="0" aria-label="通知（押すと閉じる）"></div></div>
     <main id="main" tabindex="-1"></main>
   </div>
   <footer class="disclaimer">体験版: 表示される数字・料金・手数料はすべて例です。実際の結果を保証するものではありません。</footer>
-  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="modal-root"></div>
 </body>
 </html>
