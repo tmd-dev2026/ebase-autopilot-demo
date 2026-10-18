@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var D = window.Demo, C = window.DemoCalc;
-  function net(row) { var r = C.calcProfit(row); return '<span class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + (r.net < 0 ? '赤字 ' : '黒字 ') + D.yen(r.net) + '</span>'; }
+  function net(row) { var r = C.calcProfit(row); return '<span class="' + (r.net < 0 ? 'negative' : 'positive') + '">' + (r.net < 0 ? '<span class="badge negative">⚠ 赤字</span> ' : '黒字 ') + D.yen(r.net) + '</span>'; }
   function total() { return D.yen(D.state.report.reduce(function (sum, row) { return sum + C.calcProfit(row).net; }, 0)); }
   D.register('profit-report', {
     render: function () {

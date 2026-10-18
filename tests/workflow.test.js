@@ -39,6 +39,19 @@ D.loading = async function (title, steps, duration) { assert(steps.length >= 2);
 function visit(route) { context.location.hash = '#/' + route; D.render(); }
 function form(values, extras) { return Object.assign({ values: values, matches: function () { return true; }, reportValidity: function () { return true; } }, extras); }
 function button(id, extras) { return Object.assign({ dataset: { id: id } }, extras); }
+// Reduce innermost disclosures first so nested closed details cannot leak text.
+function visibleMarkup(html) {
+  while (/<details\b/.test(html)) {
+    html = html.replace(/<details\b([^>]*)>((?:(?!<details\b)[\s\S])*?)<\/details>/g, function (_, attributes, body) {
+      if (/\bopen(?:\s|=|$)/.test(attributes)) return body;
+      assert(!/<(?:dt|td|dd)\b[^>]*>[^<]*見込み利益/.test(body), 'Profit rows must not be collapsed');
+      assert(!body.includes('赤字'), 'Loss badges must not be collapsed');
+      return '';
+    });
+  }
+  return html;
+}
+function visibleText(html) { return visibleMarkup(html).replace(/<[^>]*>/g, ' '); }
 var count = 0;
 async function test(name, run) { await run(); count += 1; console.log('PASS ' + name); }
 (async function () {
@@ -92,7 +105,7 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert(D.state.products[0].processed);
     assert.strictEqual(D.guide.index(), 3);
   });
-  await test('AI processing, editable output, and price disclosure advance', async function () {
+  await test('AI processing, editable output, and next-screen guide advance', async function () {
     await registered.products.click('ai-open', button('holo-card'));
     registered['ai-process'].input({ target: { id: 'ai-instruction', value: '状態を詳しく説明', dataset: {} } });
     await registered['ai-process'].click('ai-run', button('holo-card'));
@@ -102,14 +115,15 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     var resultHtml = registered['ai-process'].render();
     assert(resultHtml.includes('class="primary" data-action="to-profit"'));
     [resultHtml, registered.profit.render()].forEach(function (html) {
-      var visible = html.replace(/<details class="calculation-details">[\s\S]*?<\/details>/g, '');
+      var visible = visibleMarkup(html);
       assert(visible.includes('class="formula"'));
       assert(!visible.includes('13.25%') && !visible.includes('round('));
     });
     registered['ai-process'].input({ target: { dataset: { result: 'title' }, value: 'Edited Japanese Holo Card' } });
     assert.strictEqual(D.state.products[0].title, 'Edited Japanese Holo Card');
     assert(!registered['ai-process'].render().includes('review-result'));
-    node('price-card').open = true; node('price-card').toggle();
+    await registered['ai-process'].click('to-profit', button('holo-card'));
+    assert.strictEqual(context.location.hash, '#/profit');
     assert.strictEqual(D.guide.index(), 4);
   });
   await test('profit display and actual publish action use configured values', async function () {
@@ -337,6 +351,40 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     D.state.products = []; D.state.listings = []; D.state.orders = [];
     assert.strictEqual(D.priorities().length, 0);
     assert(registered.dashboard.render().includes('今日やることはありません'));
+    D.state = state;
+  });
+  await test('profit rows and loss badges are visible with disclosures closed', async function () {
+    var state = D.state; D.state = D.initialState();
+    for (var id of ['figure-large', 'film-camera']) {
+      await context.window.DemoWorkflow.acquire(D.state, id, 'normal', {});
+      D.state.events.priceSeen = false;
+      visit('ai-process/' + id);
+      var html = node('main').innerHTML, text = visibleText(html);
+      ['仕入値(USD)', '送料(USD)', 'eBay手数料', '出品価格', '見込み利益', '見込み利益率'].forEach(function (label) { assert(text.includes(label), label); });
+      assert.strictEqual(text.includes('⚠ 赤字'), id === 'figure-large');
+      assert(html.includes('<details class="calculation-details"><summary>計算の式を見る</summary>'));
+      assert(!text.includes('round(') && !text.includes('13.25%'));
+      assert(html.includes('</section><div class="row price-actions"><button class="primary" data-action="to-profit">'));
+      var p = D.product(id), shipping = Math.round(2900 + 2100 * p.weightKg);
+      var expected = Math.round((p.sale - (p.sale * 0.146 + 0.40)) * 155 - shipping - p.cost);
+      assert(text.includes(D.usd(expected / 155) + ' / ' + D.yen(expected)));
+      visit('profit');
+      text = visibleText(node('main').innerHTML);
+      assert(text.includes(D.yen(expected)));
+      assert(text.includes(id === 'figure-large' ? '⚠ 純損失' : '純利益'));
+      assert.strictEqual(text.includes('⚠ 赤字'), id === 'figure-large');
+      assert(!text.includes('round(') && !text.includes('13.25%'));
+    }
+    visit('profit-report');
+    var reportHtml = node('main').innerHTML;
+    D.state.report.forEach(function (row) {
+      var rowHtml = reportHtml.match(new RegExp('<tr data-report-row="' + row.id + '">[\\s\\S]*?</tr>'))[0];
+      var text = visibleText(reportHtml), rowText = visibleText(rowHtml);
+      var net = context.window.DemoCalc.calcProfit(row).net;
+      assert(text.includes(D.yen(net)));
+      assert.strictEqual(rowText.includes('⚠ 赤字'), net < 0);
+    });
+    assert(visibleText(reportHtml).includes('⚠ 赤字'));
     D.state = state;
   });
   await test('image-only modal, numerical pricing and direct publishing for all six products', async function () {

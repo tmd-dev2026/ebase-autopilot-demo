@@ -19,7 +19,7 @@
     var r = C.calcProfit(Object.assign({}, values, { shipping: best.price }));
     var money = function (yen) { return (values.rate > 0 ? D.usd(yen / values.rate) : '— USD') + ' / ' + D.yen(yen); };
     var rows = [['仕入値(USD)', money(r.cost)], ['送料(USD)', money(r.shipping)], ['eBay手数料', D.usd(r.feeUsd) + ' / ' + D.yen(r.feeYen)], ['出品価格', D.usd(values.sale) + ' / ' + D.yen(values.sale * values.rate)], ['見込み利益', money(r.net)], ['見込み利益率', (r.revenueYen ? (r.net / r.revenueYen * 100).toFixed(1) + '%' : '—') + '（USD・円共通）']];
-    return '<details id="price-card" class="card section"' + (D.state.events.priceSeen ? ' open' : '') + '><summary>価格設定（利益）</summary><p>最も手残りが多い配送方法: ' + best.carrier + '（配送方法・例）</p><dl class="formula">' + rows.map(function (row, i) { return '<div><dt>' + row[0] + '</dt><dd class="' + (i >= 4 ? r.net < 0 ? 'negative' : 'positive' : '') + '">' + row[1] + (i === 4 && r.net < 0 ? ' <span class="badge negative">⚠ 赤字</span>' : '') + '</dd></div>'; }).join('') + '</dl><p class="field-note">為替 ' + values.rate + ' 円/USD（例）。表示はすべて例です。手残りは保証されません。</p>' + D.calculationDetails() + '</details><div class="row price-actions"><button class="primary" data-action="to-profit">利益計算で詳しく見る</button><a class="button" href="#/listings">出品管理へ</a></div>';
+    return '<section id="price-card" class="card section"><h2>価格設定（利益）</h2><p>最も手残りが多い配送方法: ' + best.carrier + '（配送方法・例）</p><dl class="formula">' + rows.map(function (row, i) { return '<div><dt>' + row[0] + '</dt><dd class="' + (i >= 4 ? r.net < 0 ? 'negative' : 'positive' : '') + '">' + row[1] + (i === 4 && r.net < 0 ? ' <span class="badge negative">⚠ 赤字</span>' : '') + '</dd></div>'; }).join('') + '</dl><p class="field-note">為替 ' + values.rate + ' 円/USD（例）。表示はすべて例です。手残りは保証されません。</p>' + D.calculationDetails() + '</section><div class="row price-actions"><button class="primary" data-action="to-profit">利益計算で詳しく見る</button><a class="button" href="#/listings">出品管理へ</a></div>';
   }
   function readiness() {
     return D.state.products.filter(function (it) { return it.priceSet && it.ready; }).map(function (item) {
@@ -137,10 +137,6 @@
     render: function () {
       var item = imported(), p = D.selected();
       return D.heading('AI処理', p.name) + D.note('画像と商品情報をもとに英語の出品文を作り、出品前チェックまでまとめて実行します。') + (!item ? D.empty('この商品はまだ取得されていません', 'products', '商品取得へ') : '<section class="card"><h2>処理設定 <span class="badge">おすすめ: ' + D.esc(p.template) + '</span></h2><div class="segmented" aria-label="テンプレート">' + ['自動判定', 'デフォルト', 'トレカ', 'カメラ'].map(function (t) { return '<button data-action="template" data-template="' + t + '" aria-pressed="' + (item.template === t) + '">' + t + '</button>'; }).join('') + '</div><label>今回のAI処理への指示（任意）<textarea id="ai-instruction" rows="3">' + D.esc(item.instruction) + '</textarea></label><p class="field-note">個人情報は入力しないでください。英文は固定のデモです。</p><button data-action="ai-run"' + (D.working ? ' disabled' : '') + '>' + (item.processed ? 'AI処理をやり直す' : 'AI処理を実行') + '</button></section>' + (item.processed ? result(item, p) : jobs()));
-    },
-    afterRender: function () {
-      var card = document.getElementById('price-card');
-      if (card) card.addEventListener('toggle', function () { if (card.open) { D.event('priceSeen'); D.refreshGuide(); } });
     },
     click: commonAction,
     input: function (event) {

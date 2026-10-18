@@ -18,6 +18,8 @@ files.filter(function (file) { return /\.(?:html|js)$/.test(file); }).concat([pa
   removedCopy.forEach(function (word) { assert(!source.includes(word), file + ': obsolete copy ' + word); });
 });
 var productsScreen = fs.readFileSync(path.join(root, 'assets/js/screens/products.js'), 'utf8');
+assert(productsScreen.includes('<section id="price-card" class="card section"><h2>価格設定（利益）</h2>'));
+assert(!/<details[^>]*id="price-card"/.test(productsScreen));
 assert(!/data-action="detail"/.test(productsScreen));
 assert(!/>詳細<\/button>/.test(productsScreen));
 assert(!/checkListable|lossAcknowledged|acknowledgeLoss/.test(files.filter(function (file) { return file.endsWith('.js'); }).map(function (file) { return fs.readFileSync(file, 'utf8'); }).join('\n')));

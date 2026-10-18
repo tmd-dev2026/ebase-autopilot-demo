@@ -20,7 +20,7 @@
   D.save = function () { try { localStorage.setItem(storageKey, JSON.stringify(D.state)); } catch (error) { /* Memory fallback. */ } };
   D.esc = function (value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   D.yen = function (value) { var rounded = Math.round(value); return (rounded < 0 ? '-¥' : '¥') + Math.abs(rounded).toLocaleString('ja-JP'); };
-  D.usd = function (value) { return '$' + Number(value).toFixed(2); };
+  D.usd = function (value) { var n = Number(value); return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); };
   D.id = function (prefix) { return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7); };
   D.screens = screens;
   D.register = function (route, screen) { screens[route] = screen; };
