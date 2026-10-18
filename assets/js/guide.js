@@ -13,7 +13,7 @@
     ['orders', '購入を再現し、発送登録してください。', '[data-action="buy"]'],
     ['messages', 'AI 返信案を作り、確認して送信しましょう。', '[data-action="reply-ai"], [data-reply-form]'],
     ['watchers', 'ウォッチャーを見て、オファーを試しましょう。', '[data-guide-offers]'],
-    ['profit-report', '収益の下の『送料管理』を開いて、見積もりと実際の差額を確認しましょう', '#shipping-section>summary']
+    ['profit-report', '収益の下の『送料管理』を開き、送料の差額を確認しましょう。', '#shipping-section>summary']
   ];
   function index() {
     var s = D.state, e = s.events;
@@ -49,7 +49,7 @@
       if (n === 12) { route = 'summary'; step[1] = 'ひと通り体験できました'; step[2] = ''; }
       var same = D.route === route.split('/')[0], finished = n === 12 && same;
       currentTarget = step[2];
-      host.innerHTML = '<div class="guide-bar"><div class="guide-copy"><p><span class="step-label">' + (n === 12 ? '完了' : 'STEP ' + (n + 1) + ' / 12') + '</span> <strong>' + step[1] + '</strong></p><div class="guide-progress"><span style="width:' + (Math.min(n + 1, 12) / 12 * 100) + '%"></span></div></div><div class="guide-actions">' + (finished ? '' : same ? '<button class="primary" data-guide="target">ここで操作する</button>' : '<a class="button primary" data-guide-next href="#/' + route + '">' + (n === 12 ? 'まとめへ' : '体験する画面へ') + '</a>') + '<button class="text-button" data-guide="close">ガイドを閉じる</button></div>' + (n === 1 ? '<div class="guide-market">' + D.marketLink('data-guide-market') + '</div>' : '') + '</div>';
+      host.innerHTML = '<div class="guide-bar"><div class="guide-copy"><p><span class="step-label">' + (n === 12 ? '完了' : 'STEP ' + (n + 1) + ' / 12') + '</span> <strong>' + step[1] + '</strong></p><div class="guide-progress"><span style="width:' + (Math.min(n + 1, 12) / 12 * 100) + '%"></span></div></div><div class="guide-actions">' + (finished ? '' : n === 1 ? D.marketLink('class="button primary" data-guide-market aria-label="架空フリマ『eBaseマーケット(デモ)』を別タブで開く"').replace('>架空フリマ『eBaseマーケット(デモ)』を別タブで開く</a>', '>フリマを開く ↗</a>') : same ? '<button class="primary" data-guide="target">ここで操作する</button>' : '<a class="button primary" data-guide-next href="#/' + route + '">' + (n === 12 ? 'まとめへ' : '体験する画面へ') + '</a>') + '<button class="text-button" data-guide="close">ガイドを閉じる</button></div>' + '</div>';
       var target = same && step[2] ? document.querySelector(step[2]) : null;
       if (target) target.classList.add('guide-target');
       var key = n + ':' + D.route + ':' + step[2];

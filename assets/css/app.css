@@ -126,3 +126,26 @@ summary{cursor:pointer;min-height:44px;padding:10px 0}summary:focus-visible{outl
   .mobile-cards td[data-label]::before{content:attr(data-label) "：";display:block;font-weight:600;color:var(--foreground);margin-bottom:4px}
   .mobile-cards input{width:100%;min-width:0;min-height:44px;font-size:16px}
 }
+
+/* Phone shell: one header row and a two-line instruction above 44px actions. */
+@media(max-width:640px){
+  :root{--header-height:56px;--guide-height:80px}
+  .app-header{height:56px;min-height:56px;flex-wrap:nowrap;padding:0 16px;gap:4px}
+  .app-header>.row:first-child{flex-wrap:nowrap;gap:4px}
+  #menu-toggle{width:44px;padding:0;flex-shrink:0}
+  .header-brand{font-size:13px;gap:4px}
+  .header-brand svg{width:16px}
+  .app-header .badge{padding:2px 4px;white-space:nowrap}
+  .header-tools{flex-wrap:nowrap;flex-shrink:0}
+  #drawer-reset:empty{display:none}
+  #drawer-reset{margin-bottom:12px}
+  #guide{padding:0 16px}
+  .guide-bar{position:relative;display:block;padding:1px 8px 3px}
+  .guide-copy{min-width:0}
+  .guide-copy p{display:grid;grid-template-columns:74px minmax(0,1fr);gap:4px;line-height:15px}
+  .step-label{letter-spacing:0;white-space:nowrap}
+  .guide-copy strong{font-size:12px;font-weight:600}
+  .guide-actions{display:flex;flex-wrap:nowrap;justify-content:flex-end;gap:4px}
+  .guide-actions button,.guide-actions a{min-height:44px;padding:0 8px;white-space:nowrap}
+  .guide-progress{position:absolute;bottom:0;left:8px;right:8px;height:2px;margin:0}
+}

@@ -182,6 +182,14 @@
       document.documentElement.dataset.theme = window.DemoTheme.toggle(current, storage); themeButton();
     });
     if (systemTheme && systemTheme.addEventListener) systemTheme.addEventListener('change', themeButton);
+    var phoneHeader = window.matchMedia('(max-width:640px)');
+    function placeReset() {
+      var button = document.getElementById('reset-button');
+      var host = phoneHeader.matches ? document.getElementById('drawer-reset') : document.querySelector('.header-tools');
+      if (button.parentNode !== host) host.appendChild(button);
+    }
+    placeReset();
+    if (phoneHeader.addEventListener) phoneHeader.addEventListener('change', placeReset);
     function measureShell() {
       [['.app-header', '--header-height'], ['.disclaimer', '--footer-height'], ['#guide-shell', '--guide-height']].forEach(function (entry) {
         document.documentElement.style.setProperty(entry[1], Math.ceil(document.querySelector(entry[0]).getBoundingClientRect().height) + 'px');

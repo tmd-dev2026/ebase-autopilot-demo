@@ -1,13 +1,14 @@
 'use strict';
 // Execute the actual guide, shell listeners and toast timer without a browser.
 var assert = require('assert'), fs = require('fs'), path = require('path'), vm = require('vm');
-var root = path.resolve(__dirname, '..'), ready = [], frames = [], timers = [], nodes = {}, events = {}, reduced = false;
+var root = path.resolve(__dirname, '..'), ready = [], frames = [], timers = [], nodes = {}, events = {}, reduced = false, phone = false, phoneChange;
 function node(id) {
   if (nodes[id]) return nodes[id];
   var classes = new Set();
   return nodes[id] = {
     id: id, innerHTML: '', textContent: '', dataset: {}, attrs: {}, hidden: false,
     classList: { add: function (name) { classes.add(name); }, remove: function (name) { classes.delete(name); }, contains: function (name) { return classes.has(name); } },
+    appendChild: function (child) { child.parentNode = this; },
     addEventListener: function (type, callback) { this[type] = callback; },
     setAttribute: function (name, value) { this.attrs[name] = value; }, getAttribute: function (name) { return this.attrs[name]; },
     matches: function () { return true; }, focus: function (options) { this.focusOptions = options; },
@@ -23,7 +24,7 @@ var document = {
   getElementById: node, querySelectorAll: function () { return []; },
   querySelector: function (selector) {
     if (selector === '.modal') return null;
-    if (selector === '.app-header' || selector === '.disclaimer' || selector === '#guide-shell') return node(selector);
+    if (selector === '.header-tools' || selector === '.app-header' || selector === '.disclaimer' || selector === '#guide-shell') return node(selector);
     if (selector === '[data-guide-next]') return node('next-link');
     return target;
   }
@@ -33,7 +34,7 @@ var context = vm.createContext({
   localStorage: { getItem: function () { return null; }, setItem: function () {} },
   setTimeout: function (callback, duration) { timers.push({ callback: callback, duration: duration }); return timers.length; }, clearTimeout: function () {},
   window: {
-    matchMedia: function (query) { return { matches: query.includes('reduced-motion') && reduced, addEventListener: function () {} }; },
+    matchMedia: function (query) { return { get matches() { return query.includes('640px') ? phone : query.includes('reduced-motion') && reduced; }, addEventListener: function (name, callback) { if (query.includes('640px')) phoneChange = callback; } }; },
     addEventListener: function (name, callback) { events[name] = callback; },
     scrollTo: function () {}, requestAnimationFrame: function (callback) { frames.push(callback); }
   }
@@ -43,6 +44,12 @@ function load(name) { vm.runInContext(fs.readFileSync(path.join(root, 'assets/js
 var D = context.window.Demo;
 ['welcome', 'products', 'profit', 'summary', 'shipping'].forEach(function (route) { D.register(route, { render: function () { return ''; } }); });
 ready.forEach(function (fn) { fn(); });
+assert.strictEqual(node('reset-button').parentNode, node('.header-tools'));
+phone = true; phoneChange();
+assert.strictEqual(node('reset-button').parentNode, node('drawer-reset'));
+assert.strictEqual(typeof node('reset-button').click, 'function', 'Moved button keeps confirmation handler');
+phone = false; phoneChange();
+assert.strictEqual(node('reset-button').parentNode, node('.header-tools'));
 function guideClick(action) { node('guide').click({ target: { closest: function () { return { dataset: { guide: action } }; } } }); }
 assert(node('guide').innerHTML.includes('ここで操作する'));
 guideClick('target');
@@ -51,7 +58,12 @@ assert.strictEqual(target.scrollOptions.behavior, 'smooth');
 assert.strictEqual(target.focusOptions.preventScroll, true);
 assert.strictEqual(D.state.guide, true, 'The target button must not turn the guide off');
 reduced = true; guideClick('target'); assert.strictEqual(target.scrollOptions.behavior, 'auto');
-D.state.started = true; D.state.marketOpened = true; D.route = 'products'; target = node('import-url'); D.guide.render();
+D.state.started = true; D.guide.render();
+assert(node('guide').innerHTML.includes('data-guide-market'));
+assert(node('guide').innerHTML.includes('フリマを開く ↗'));
+assert(!node('guide').innerHTML.includes('class="guide-market"'), 'Market link must not add a third row');
+assert(node('guide').innerHTML.includes('target="_blank" rel="noopener" data-market'));
+D.state.marketOpened = true; D.route = 'products'; target = node('import-url'); D.guide.render();
 frames.splice(0).forEach(function (fn) { fn(); });
 assert.strictEqual(D.guide.index(), 2); assert.strictEqual(target.scrollCount, 1, 'Step change reveals URL input');
 D.guide.render(); assert.strictEqual(frames.length, 0, 'Unchanged steps do not steal focus');
@@ -110,3 +122,22 @@ assert(css.includes('.mobile-cards>table,.mobile-cards tbody'));
 assert(css.includes('@media(prefers-reduced-motion:reduce)'));
 assert(css.includes('outline:3px solid var(--primary)'));
 console.log('Usability checks passed: guide actions/advance/completion, reduced motion, drawer close, toast timers/dismiss, formulas, mobile sizing.');
+
+assert(css.includes('--header-height:56px;--guide-height:80px'));
+assert(css.includes('scroll-margin-top:calc(var(--header-height) + var(--guide-height) + 16px)'));
+assert(css.includes('.guide-actions{display:flex;flex-wrap:nowrap;'));
+(async function () {
+  phone = true; phoneChange();
+  node('menu-toggle').click();
+  var original = D.state, confirmed = 0;
+  D.confirm = async function () { confirmed += 1; return false; };
+  await node('reset-button').click();
+  assert.strictEqual(confirmed, 1);
+  assert.strictEqual(D.state, original, 'Cancelling phone reset preserves state');
+  assert(!node('sidebar').classList.contains('open'));
+  D.state.started = true;
+  D.confirm = async function () { confirmed += 1; return true; };
+  await node('reset-button').click();
+  assert.strictEqual(confirmed, 2);
+  assert.strictEqual(D.state.started, false, 'Confirming phone reset restores initial state');
+})().catch(function (error) { console.error(error); process.exitCode = 1; });
