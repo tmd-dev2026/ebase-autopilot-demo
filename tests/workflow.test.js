@@ -78,12 +78,43 @@ async function test(name, run) { await run(); count += 1; console.log('PASS ' + 
     assert.strictEqual(D.state.products.length, 0);
     assert.strictEqual((registered.watchers.render().match(/<tr>/g) || []).length, 7);
     assert.strictEqual(D.guide.index(), 0);
-    assert(registered.summary.render().endsWith('<!-- CTA_PLACEHOLDER -->'));
     var summary = registered.summary.render();
+    assert(summary.includes('<section class="card"><h2>次のステップ</h2><p>このあとの流れや料金は、説明会の担当者がご案内します。</p></section>'));
+    assert(summary.indexOf('次のステップ') > summary.indexOf('</ul>'));
+    assert.strictEqual((summary.match(/○ 未体験/g) || []).length, (summary.match(/<a /g) || []).length);
     assert.strictEqual((summary.match(/○ 未体験/g) || []).length, (summary.match(/<a href=/g) || []).length);
     assert(summary.includes('href="#/profit-report"'));
     assert(registered.monitor.render().includes('おすすめ'));
     assert(registered.listings.render().includes('おすすめ'));
+  });
+  await test('summary next steps accepts only HTTPS and escapes configured content', function () {
+    var config = context.window.DemoConfig;
+    var original = Object.assign({}, config);
+    assert.strictEqual(config.ctaUrl, '');
+    assert.strictEqual(config.ctaLabel, '説明会の担当者に相談する');
+    try {
+      ['', 'javascript:alert(1)', 'http://example.test/', '/next', null, 123, {}].forEach(function (url) {
+        config.ctaUrl = url;
+        var html = registered.summary.render();
+        assert(html.includes('<h2>次のステップ</h2><p>' + original.ctaNote + '</p></section>'));
+        assert.strictEqual((html.match(/<a /g) || []).length, (html.match(/○ 未体験/g) || []).length);
+        assert(!html.includes('準備中'));
+      });
+      config.ctaUrl = 'https://example.test/next';
+      var html = registered.summary.render();
+      assert(html.includes('<a class="button" href="https://example.test/next" target="_blank" rel="noopener noreferrer">説明会の担当者に相談する</a>'));
+      assert.strictEqual((html.match(/<a /g) || []).length, (html.match(/○ 未体験/g) || []).length + 1);
+      config.ctaUrl = 'https://example.test/\"><script>&';
+      config.ctaLabel = '\"><script>&';
+      config.ctaNote = '\"><script>&';
+      html = registered.summary.render();
+      assert(html.includes('href="https://example.test/&quot;&gt;&lt;script&gt;&amp;"'));
+      assert(html.includes('rel="noopener noreferrer">&quot;&gt;&lt;script&gt;&amp;</a>'));
+      assert(html.includes('<p>&quot;&gt;&lt;script&gt;&amp;</p>'));
+      assert(!html.includes('<script>'));
+    } finally {
+      Object.assign(config, original);
+    }
   });
   await test('URL rejection and actual product acquisition', async function () {
     D.state.started = true; D.state.marketOpened = true;

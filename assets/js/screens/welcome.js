@@ -13,6 +13,9 @@
   D.register('summary', {
     render: function () {
       var s = D.state, e = s.events;
+      var config = window.DemoConfig;
+      var cta = '<section class="card"><h2>次のステップ</h2><p>' + D.esc(config.ctaNote) + '</p>' +
+        (typeof config.ctaUrl === 'string' && config.ctaUrl.startsWith('https://') ? '<a class="button" href="' + D.esc(config.ctaUrl) + '" target="_blank" rel="noopener noreferrer">' + D.esc(config.ctaLabel) + '</a>' : '') + '</section>';
       var items = [
         [s.products.length, 'URL から商品情報を取得'], [s.products.some(function (p) { return p.processed; }), '英語タイトル・説明文・商品詳細の作成'],
         [e.priceSeen || e.listed, '出品前の注意点をチェック'], [e.profitCompared || e.listed, '送料と手残りを自動計算'], [e.listed, '確認した商品を出品'],
@@ -21,7 +24,7 @@
         [e.templateCreated, '自動出品のスケジュールを設定'], [e.reportSeen && e.shippingSeen, '収益と送料の差額を集計']
       ];
       var routes = ['products', 'products', s.products.some(function (p) { return p.id === s.selected; }) ? 'ai-process/' + s.selected : 'products', 'profit', 'listings', 'monitor', 'orders', 'messages', 'offers', 'auto-list', 'profit-report'];
-      return D.heading('体験のまとめ', '自動になる作業と、あなたが判断すること。', 'YOUR EXPERIENCE') + D.note('繰り返しの作業を自動で進め、状況をまとめてお知らせします。出品内容や商品状態、利益は出品者が確認します。') + '<section class="card"><h2>今回体験したこと</h2><ul class="check-list">' + items.map(function (item, i) { return '<li><span class="' + (item[0] ? 'scheduled' : 'muted') + '">' + (item[0] ? '✓ 体験済み' : '○ 未体験') + '</span>　' + (item[0] ? item[1] : '<a href="#/' + routes[i] + '">' + item[1] + '</a>') + '</li>'; }).join('') + '</ul></section><section class="card"><h2>本物との違い</h2><p>この体験版は、商品取得・AI処理・出品・取引を固定のダミーデータで再現しています。<br>本物では外部サービスとの接続と設定が必要になり、結果は商品や条件によって変わります。<br>体験版の価格・手数料・送料・為替・手残りはすべて例で、実際の結果を保証しません。</p></section><!-- CTA_PLACEHOLDER -->';
+      return D.heading('体験のまとめ', '自動になる作業と、あなたが判断すること。', 'YOUR EXPERIENCE') + D.note('繰り返しの作業を自動で進め、状況をまとめてお知らせします。出品内容や商品状態、利益は出品者が確認します。') + '<section class="card"><h2>今回体験したこと</h2><ul class="check-list">' + items.map(function (item, i) { return '<li><span class="' + (item[0] ? 'scheduled' : 'muted') + '">' + (item[0] ? '✓ 体験済み' : '○ 未体験') + '</span>　' + (item[0] ? item[1] : '<a href="#/' + routes[i] + '">' + item[1] + '</a>') + '</li>'; }).join('') + '</ul></section><section class="card"><h2>本物との違い</h2><p>この体験版は、商品取得・AI処理・出品・取引を固定のダミーデータで再現しています。<br>本物では外部サービスとの接続と設定が必要になり、結果は商品や条件によって変わります。<br>体験版の価格・手数料・送料・為替・手残りはすべて例で、実際の結果を保証しません。</p></section>' + cta;
     }
   });
 }());
